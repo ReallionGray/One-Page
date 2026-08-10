@@ -25,6 +25,18 @@ public class ApiIntegrationTests
         Assert.Contains("ENTITLEMENT_DENIED", content);
     }
 
+    [Fact] public async Task Api_propagates_tenant_context_to_scoped_platform_services()
+    {
+        await using var host = await StartHost();
+        using var request = new HttpRequestMessage(HttpMethod.Get, "/api/v1/platform/context");
+        request.Headers.Add("X-User-Id", "user-9"); request.Headers.Add("X-Tenant-Id", "tenant-9"); request.Headers.Add("X-Correlation-Id", "corr-9");
+        using var response = await host.Client.SendAsync(request);
+        var body = await response.Content.ReadAsStringAsync();
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        Assert.Contains("tenant-9", body);
+        Assert.Contains("user-9", body);
+    }
+
     private static async Task<RunningHost> StartHost()
     {
         var app = ApiHost.Create();
