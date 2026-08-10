@@ -1,0 +1,856 @@
+ONE PAGE — PRODUCT BLUEPRINT
+Version 1.0 | 10 August 2026
+Status: Foundational product and delivery blueprint
+
+This document is the working source of truth for product direction, business requirements,
+technical requirements, delivery sequencing, governance, and launch readiness. It is deliberately
+country-neutral in its platform design, but payroll must not be implemented until the first launch
+country and its legal/compliance model are formally selected.
+
+1. EXECUTIVE SUMMARY
+
+One Page is a modular, multi-tenant operating platform for growing organizations. It connects
+people, payroll, purchasing, expenses, assets, approvals, documents, reporting, and—later—inventory,
+point of sale, finance, CRM, and industry workflows in one coherent system.
+
+The product thesis is:
+
+  Growing companies should be able to run their recurring people-and-money processes in one
+  trusted place, with clear ownership, configurable approvals, and a complete audit trail.
+
+One Page is not initially a full ERP. Its advantage is the shared control plane:
+
+  one organization model, one identity layer, one workflow system, one entitlement system,
+  one audit trail, and consistent cross-module user experience.
+
+Recommended launch wedge:
+
+  Core platform + HR + one-country Payroll + Procurement + basic Asset Management,
+  supported by reporting, documents, import/export, audit, and accounting integrations.
+
+Point of Sale, advanced Inventory, full Accounting, CRM, manufacturing, and industry-specific
+modules are expansion tracks, not launch commitments.
+
+2. VISION, MISSION, AND POSITIONING
+
+Vision
+  Every growing business has a simple, trusted operating system for its core processes.
+
+Mission
+  Make business operations visible, controlled, and easy to execute for organizations that have
+  outgrown spreadsheets, disconnected applications, and informal approvals.
+
+Positioning
+  One Page is the configurable operating layer for growing businesses—connecting people,
+  approvals, money, assets, and daily operations in one system.
+
+Core promise
+  One Page gives leaders visibility, gives teams simple self-service, and gives finance, HR,
+  and operations the controls needed to execute confidently.
+
+3. TARGET MARKET AND CUSTOMER SEGMENTS
+
+Initial ideal customer profile
+
+  * 20–500 employees, with an initial preference for 50–500.
+  * Multiple departments, branches, locations, or legal entities.
+  * A recurring need for payroll, leave, approvals, purchases, expenses, or asset tracking.
+  * Current reliance on spreadsheets, email, WhatsApp, paper, or several disconnected systems.
+  * A responsible HR, finance, operations, or accounting owner.
+  * Willingness to adopt a subscription product and participate in assisted onboarding.
+
+Best initial verticals
+
+  * Retail and distribution
+  * Professional services
+  * Schools and education groups
+  * Healthcare groups and pharmacies
+  * Hospitality and restaurants
+  * NGOs and development organizations
+  * Logistics and field-service businesses
+
+The first launch must choose one primary segment, one buyer, and one country. Vertical-specific
+templates should follow customer evidence rather than being built speculatively.
+
+Personas
+
+  Founder/CEO: wants visibility, control, and exception-based reporting.
+  Finance lead: wants accurate payroll, spend controls, reconciliations, and audit evidence.
+  HR manager: owns employee records, leave, onboarding, documents, and employee experience.
+  Operations manager: coordinates branches, assets, tasks, and approvals.
+  Department manager: approves requests quickly within delegated authority.
+  Employee: accesses payslips, submits leave and expenses, and tracks requests from a phone.
+  Buyer/procurement officer: manages vendors, purchase requests, orders, and receipts.
+  Asset custodian: knows where assets are, who has them, and what condition they are in.
+  External accountant: needs reliable exports, traceability, and controlled access.
+  System administrator: manages users, roles, entitlements, policies, and integrations.
+  Branch/store manager: later manages attendance, inventory, POS, cash, and local approvals.
+
+4. JOBS TO BE DONE
+
+Executive
+  When I need to know whether the company is operating properly, show me important exceptions
+  without asking several people for spreadsheets.
+
+Finance
+  When money is requested, purchased, reimbursed, or paid, give me a controlled process with
+  evidence, approvals, and reconciliation.
+
+HR
+  When an employee joins, changes role, takes leave, or exits, keep the record accurate and
+  update dependent processes safely.
+
+Employee
+  When I need a document or want to submit a request, let me do it quickly without chasing HR
+  or finance.
+
+Operations
+  When branches operate differently, enforce common policies while allowing controlled local
+  configuration.
+
+Accountant
+  When I close a period, give me complete, traceable data that can be exported or reconciled.
+
+5. PRODUCT SCOPE AND MODULE MAP
+
+Shared platform foundation — launch-critical
+
+  * Tenant, legal-entity, branch, department, location, and cost-center management
+  * Users, memberships, teams, roles, permissions, and scoped access
+  * Subscription plans, add-ons, entitlements, usage, and billing states
+  * Approval workflows, tasks, delegation, escalation, and notifications
+  * Documents, attachments, search, comments, and activity timelines
+  * Audit log, reporting, dashboards, exports, and data import
+  * API, webhooks, integrations, background jobs, and observability
+  * Feature flags, configuration, data retention, export, and deletion controls
+
+Human Resources — launch
+
+Owns employee lifecycle and people records:
+
+  * Employee master record and employment history
+  * Departments, positions, managers, branches, and cost centers
+  * Onboarding/offboarding checklists
+  * Leave policies, balances, requests, approvals, and holidays
+  * Employee documents and expiry alerts
+  * Basic attendance import
+  * Employee self-service
+
+Deferred HR: recruitment marketplace, advanced performance management, learning, succession,
+and complex workforce planning.
+
+Payroll — launch, one jurisdiction
+
+Owns payroll calculations and payroll-period records, consuming HR data:
+
+  * Pay groups, calendars, pay frequencies, and payroll periods
+  * Earnings, allowances, deductions, benefits, taxes, and statutory rules
+  * Input validation, preview, variance analysis, approval, lock, and publish
+  * Payslips, statutory reports, bank/payment export, and accounting export
+  * Corrections, reversals, off-cycle processing, and audit history
+
+Payroll must use effective-dated, versioned country rules. Closed periods must be reproducible and
+must not change when a current employee record changes. Compliance claims require qualified local
+tax/payroll review.
+
+Procurement and Expenses — launch
+
+  * Vendor master and supporting documents
+  * Purchase requisitions and approval chains
+  * Purchase orders and status tracking
+  * Goods/service receipt
+  * Budget threshold checks
+  * Employee expense claims and reimbursement workflow
+  * Basic spend reporting and accounting export
+
+Deferred Procurement: competitive sourcing, tenders, contract lifecycle, full invoice automation,
+three-way matching, corporate cards, and advanced spend analytics.
+
+Asset Management — launch
+
+  * Asset register, categories, serial numbers, and acquisition source
+  * Assignment to an employee, department, branch, or location
+  * Condition, custody, transfer, return, maintenance, and warranty dates
+  * Disposal workflow and complete asset history
+  * Depreciation inputs or controlled export to accounting
+
+Inventory — expansion
+
+  * Items, SKUs, units of measure, warehouses, stock movements, transfers, counts, adjustments,
+    reorder thresholds, and valuation.
+
+Point of Sale — expansion
+
+  * Stores, registers, cash sessions, products, prices, sales, refunds, discounts, receipts,
+    payments, cash close, and inventory movement.
+  * Requires offline operation, device support, payment-provider assessment, reconciliation,
+    fraud controls, and PCI responsibility boundaries.
+
+Finance and Accounting — integration first, full module later
+
+  * Launch: chart-of-account mapping, journal exports, payment references, reconciliation support.
+  * Later: general ledger, AP, AR, bank reconciliation, budgets, tax, period close, and consolidation.
+
+Additional expansion modules
+
+  * CRM and customer management
+  * Project and work management
+  * Fleet and logistics
+  * School administration
+  * Clinic/pharmacy operations
+  * NGO grants and project reporting
+  * Field-service management
+  * Recruitment and learning
+
+6. MVP DEFINITION
+
+MVP outcome
+  A design-partner organization can manage its core employee lifecycle and controlled purchasing
+  processes in One Page, complete a verified one-country payroll run, and produce evidence-backed
+  reports and exports without engineering intervention.
+
+MVP includes
+
+  1. Core administration and organization structure
+  2. Identity, roles, scoped permissions, and MFA-ready access
+  3. Subscription/entitlement engine and billing adapter
+  4. Audit, notifications, documents, import/export, and reporting
+  5. HR core, leave, onboarding/offboarding, and employee self-service
+  6. One-country Payroll for a deliberately limited compensation model
+  7. Procurement requests, approvals, vendors, purchase orders, and receipts
+  8. Basic expenses and reimbursements
+  9. Basic Asset Management
+  10. Accounting/bank export integrations as needed by design partners
+
+MVP exclusions
+
+  * Full POS and offline retail operation
+  * Full accounting ledger
+  * Multi-country payroll
+  * Complex commission, equity, contractor, or cross-border payroll
+  * Advanced inventory or manufacturing
+  * Recruitment marketplace, LMS, advanced performance
+  * Embedded lending, banking, or payment custody
+  * Advanced AI automation
+
+MVP product rule
+  Every feature should clearly answer who is involved, what money/entitlement/asset is affected,
+  and who approved it, when, and under which policy.
+
+7. REPRESENTATIVE USER STORIES AND ACCEPTANCE CRITERIA
+
+Administration
+
+  * As an administrator, I can create legal entities, branches, departments, locations, and
+    cost centers so that records can be scoped correctly.
+  * As an administrator, I can invite a user, assign roles and scopes, and remove access.
+  * As an auditor, I can see who changed a record, what changed, when, from where, and why.
+  * As an organization owner, I can export my data and understand what happens if a module is
+    downgraded or cancelled.
+
+Entitlements
+
+  * As an account owner, I can subscribe to a plan and add or remove modules without redeploying.
+  * As a system, I reject backend requests when the tenant lacks the required entitlement,
+    even if the UI is bypassed.
+  * As an account owner, when a module is disabled, historical records remain readable and
+    exportable according to policy; new transactions are blocked or read-only.
+  * As a billing operator, I can apply a grace period, retry failed payments, and audit every
+    subscription change.
+
+HR
+
+  * As HR, I can create an employee with employment, tax, bank, emergency-contact, and document
+    information.
+  * As HR, I can onboard an employee using a checklist with owners, due dates, and evidence.
+  * As an employee, I can view my profile and request a correction without editing protected fields.
+  * As an employee, I can request leave and see balance, approvers, status, and decision history.
+  * As HR, I can offboard an employee and trigger an access-review checklist.
+
+Payroll
+
+  * As a payroll officer, I can select a pay group, validate inputs, and preview expected results.
+  * As a payroll officer, I cannot approve my own payroll run.
+  * As finance, I can compare the current run with the previous run and investigate variances.
+  * As an authorized approver, I can approve and lock a payroll period; later corrections require
+    a controlled reversal or adjustment.
+  * As an employee, I can access only my own payslips.
+  * As an accountant, I can export a payroll journal and statutory reports with a run identifier.
+
+Procurement and expenses
+
+  * As a staff member, I can submit a purchase request with cost center, amount, justification,
+    vendor information, and attachments.
+  * As a manager, I can approve only requests within my scope and delegated authority.
+  * As a buyer, I can turn an approved request into a purchase order without re-keying data.
+  * As a receiver, I can record partial or full receipt and attach evidence.
+  * As an employee, I can submit an expense claim and track approval and reimbursement status.
+  * As finance, I can prevent payment when required approvals or evidence are missing.
+
+Assets
+
+  * As an asset custodian, I can register an asset and assign it to a person or location.
+  * As a manager, I can approve transfers and see the custody history.
+  * As finance, I can export acquisition and depreciation inputs.
+  * As an administrator, I can dispose of an asset only through an auditable approval workflow.
+
+8. BUSINESS REQUIREMENTS
+
+BR-001 Product focus
+  The first release shall target one country, one primary ICP, one buyer, and one measurable
+  customer outcome.
+
+BR-002 Multi-tenant operation
+  A customer account shall support one or more legal entities, branches, departments, locations,
+  cost centers, and users while preserving strict tenant isolation.
+
+BR-003 Configurable control
+  Customers shall configure approval thresholds, approvers, delegation, escalation, leave rules,
+  payroll inputs, and module settings without custom code for normal use cases.
+
+BR-004 Segregation of duties
+  The system shall support maker-checker, approval limits, self-approval prevention, and scoped
+  access for payroll, purchases, payments, refunds, sensitive HR fields, and asset disposal.
+
+BR-005 Auditability
+  Material actions and privileged access shall have an immutable or tamper-evident, tenant-scoped
+  audit record, available to authorized users and exportable.
+
+BR-006 Payroll controls
+  Payroll shall support preview, variance analysis, versioned rules, effective dates, period lock,
+  correction/reversal, approval evidence, reconciliation, and reproducible historical results.
+
+BR-007 Migration
+  The product shall import employee, department, location, leave, compensation, vendor, asset,
+  user, and opening data through validated templates with exception and reconciliation reports.
+
+BR-008 Subscription lifecycle
+  The product shall support trial, active, grace period, suspended, expired, read-only, upgrade,
+  downgrade, add-ons, usage limits, cancellation, export, and reactivation states.
+
+BR-009 Data rights and exit
+  Customers shall be able to export their data in documented formats. Retention, deletion, legal
+  hold, correction, and access-request workflows shall be defined per jurisdiction and contract.
+
+BR-010 Localization
+  The system shall support time zones, currencies, locale formatting, regional addresses and
+  phone numbers, effective-dated country rules, and country-specific document/report formats.
+
+BR-011 Reporting
+  Reports shall identify their source, scope, period, freshness, filters, and permissions. Payroll
+  and financial reports must reconcile to authoritative transaction records.
+
+BR-012 Customer operations
+  The service shall provide onboarding, support tiers, incident communication, runbooks, SLOs,
+  status visibility, and payroll-period escalation coverage.
+
+9. SUBSCRIPTION AND ENTITLEMENT MODEL
+
+Packaging recommendation
+
+  Starter: core administration, HR records, leave, basic approvals, basic reporting.
+  People: Starter + payroll, attendance, employee self-service, payslips, statutory reports.
+  Operations: People + procurement, expenses, assets, budgets, branch/cost-center controls.
+  Commerce: Operations + inventory, POS, store operations, cash reconciliation.
+  Enterprise: multi-entity/country, SSO, advanced permissions, custom workflows, enhanced audit,
+    dedicated support, SLA, data residency, and integration capacity.
+
+Use a hybrid commercial model:
+
+  * Base platform fee per organization
+  * Active employees for HR/payroll
+  * Named operators for finance/POS
+  * Branches, legal entities, registers, or transaction volume where value is usage-based
+  * Paid implementation, migration, premium support, and integrations
+
+Entitlement dimensions
+
+  * Module: module.hr, module.payroll, module.procurement, module.assets, module.pos
+  * Feature: feature.hr.performance, feature.payroll.off_cycle, feature.procurement.matching
+  * Limits: users, active_employees, branches, registers, storage_gb, API_calls, transactions
+  * Country pack and regulatory scope
+  * Retention period, reporting depth, support tier, and dedicated infrastructure
+
+Plan versions must be immutable. Subscription changes reference a plan version and effective date.
+The entitlement decision must return enabled/disabled, source, limit, current usage, effective date,
+and grace-period status.
+
+Entitlements and permissions are separate:
+
+  Entitlement: the tenant subscribes to Payroll.
+  Permission: this user may run payroll for Legal Entity A.
+  Both checks must pass on the server.
+
+Backend entitlement checks are required at endpoints, commands, jobs, event consumers, exports,
+reports, and integrations. UI hiding is only a usability feature.
+
+10. TECHNICAL ARCHITECTURE
+
+Architecture principle
+  Modules own their domain data and rules. The platform owns tenancy, identity, entitlements,
+  workflow infrastructure, billing, notifications, documents, audit, and integration infrastructure.
+
+Recommended starting shape
+  Begin with a modular monolith, not distributed microservices:
+
+  * One deployable backend with strict domain boundaries
+  * One PostgreSQL cluster with separate schemas or namespaces per bounded context
+  * Internal module interfaces and architecture tests
+  * Transactional outbox and durable background jobs
+  * Independent frontend module boundaries inside one application shell
+  * Clear extraction criteria based on scale, compliance, team ownership, or availability
+
+Logical architecture
+
+  Web / mobile / partner API
+          |
+  CDN/WAF + API gateway/BFF
+          |
+  Identity | Tenant context | Permissions | Entitlements
+          |
+  Workflows | Audit | Billing | Files | Notifications | Search | Reporting
+          |
+  HR | Payroll | Procurement | Expenses | Assets | Inventory | POS | Finance
+          |
+  PostgreSQL | Redis | object storage | queue | analytics read models
+
+Tenant hierarchy
+
+  Platform
+    Customer account / tenant
+      Legal entities
+        Business units / branches / locations / departments / warehouses
+          Users, teams, employees, vendors, customers, and records
+
+Tenant isolation tiers
+
+  Shared: tenant_id on every tenant row, database defense-in-depth, automated isolation tests.
+  Dedicated database: for larger or special-compliance customers.
+  Dedicated environment: for regulated enterprise or data-residency requirements.
+
+Never trust a tenant ID supplied only in a request body. Tenant context must be derived from the
+authenticated session, selected organization, API client, or verified partner context.
+
+Identity and authorization
+
+  * OIDC authentication; SAML/SCIM for enterprise tiers.
+  * MFA for administrators; WebAuthn or TOTP support.
+  * Short-lived tokens and rotating refresh tokens.
+  * A user may belong to multiple tenants with different roles.
+  * Use RBAC plus scoped/attribute-based access: legal entity, department, branch, manager chain,
+    employment status, sensitivity, time validity, amount limit, and delegation.
+  * Support joiner/mover/leaver flows, service accounts, API keys, session controls, recovery,
+    and time-limited support elevation with reason and full audit.
+
+Canonical bounded contexts
+
+  Platform/Tenancy: tenants, legal entities, locations, users, memberships, roles, subscriptions.
+  Party/Organization: reusable employees, suppliers, customers, contacts, teams, addresses.
+  HR: employee lifecycle, contracts, leave, attendance, documents, performance later.
+  Payroll: pay groups, periods, calculations, payslips, statutory outputs, approvals.
+  Procurement: requisitions, suppliers, POs, receipts, invoices/matching later.
+  Expenses: claims, policies, approvals, reimbursements.
+  Assets: register, assignment, maintenance, depreciation inputs, disposal.
+  Inventory: items, SKUs, stock movements, locations, counts, valuation.
+  POS: stores, registers, cash sessions, sales, refunds, payments, offline sync.
+  Finance: chart of accounts, journals, AP/AR, reconciliation, period close later.
+  Reporting: report definitions, read models, dashboards, exports, data access policy.
+
+Data ownership rules
+
+  Employee profile -> HR owns; Payroll and reporting consume.
+  Payroll result -> Payroll owns; Finance and employee portal consume.
+  Supplier -> Party/Procurement owns; purchasing and finance consume.
+  Purchase order -> Procurement owns; Inventory and Finance consume.
+  Stock movement -> Inventory owns; POS and reporting consume.
+  Asset depreciation -> Assets owns; Finance and reporting consume.
+  Sale -> POS owns; Inventory and Finance consume.
+  Subscription -> Billing owns; Entitlement service consumes.
+
+Do not allow modules to write another module's tables or directly post arbitrary accounting entries.
+Use stable contracts and events.
+
+Workflow requirements
+
+Workflows are a platform capability, with versioned definitions and persisted instances. Support:
+
+  * Triggers, states, tasks, conditions, approvers, amount thresholds
+  * Delegation with effective dates
+  * Escalation, reminders, SLAs, rejection/rework, cancellation, and expiry
+  * Comments, attachments, decision evidence, and complete transition history
+  * Self-approval and circular-approval prevention
+  * Idempotent commands and durable retries
+  * Existing instances continuing on their original workflow version
+
+Use a persisted state machine first. Consider Temporal/Camunda only when workflow complexity and
+operational evidence justify it.
+
+Audit requirements
+
+Audit authentication, permissions, subscriptions, HR changes, payroll calculations and approvals,
+purchase approvals, inventory adjustments, asset disposal, refunds, exports, support access,
+integration credentials, and workflow transitions.
+
+Audit record should include: event ID, tenant, actor and delegated actor, action, resource, before/
+after or relevant change, reason, source, IP/user agent where appropriate, correlation ID, and time.
+Store append-only or tamper-evident records. Application logs are not a substitute.
+
+API and event requirements
+
+  * REST/OpenAPI with /api/v1 versioning initially.
+  * Consistent errors, pagination, filtering, rate limits, ETags/version checks, correlation IDs.
+  * Idempotency keys for commands that create or move money/periods/stock.
+  * Public contracts must not expose internal database models.
+  * Use transactional outbox for cross-module events.
+  * Events are tenant-scoped, versioned, immutable, traceable, and idempotently consumed.
+  * Suggested events: employee.hired, employee.terminated, payroll.period.approved,
+    purchase_order.approved, goods_receipt.completed, asset.assigned, subscription.changed,
+    pos.sale.completed, workflow.task.created.
+
+Integration hub
+
+Adapters may be added for accounting, banks/payment providers, tax/statutory services, email/SMS,
+identity, attendance devices, e-commerce, shipping, POS hardware, CRM, and data warehouses.
+Each adapter needs credential storage, signed webhook verification, retry/replay, rate limits,
+mapping, dead-letter handling, synchronization history, reconciliation, and customer-visible health.
+
+Billing
+
+One Page billing should be provider-neutral. Provider adapters may include Stripe, Paystack,
+Flutterwave, or enterprise invoicing, subject to market and regulatory review. The internal system
+owns plans, plan versions, subscriptions, usage, invoices, credits, proration, grace periods,
+cancellation, and entitlement activation. Provider webhooks must be signature-verified and idempotent.
+
+Files
+
+Use object storage for documents and store metadata in PostgreSQL. Require tenant isolation,
+encryption, malware scanning, content-type/size validation, quarantine, versioning, retention,
+access logging, short-lived signed URLs, and legal hold support.
+
+Frontend
+
+Use one application shell with tenant switcher, global search, notifications, user controls, and
+module navigation. Use a shared design system for forms, tables, approvals, status, audit timelines,
+empty/error states, and upgrade/read-only states. Backend enforcement is authoritative.
+
+Reference technology baseline
+
+  * Backend: ASP.NET Core or NestJS; select one after team and repository review.
+  * Frontend: React + TypeScript.
+  * Data: PostgreSQL, Redis, object storage, managed queue.
+  * Deployment: containers on a managed platform; introduce Kubernetes only if justified.
+  * Identity: managed OIDC/SAML provider.
+  * Observability: OpenTelemetry-compatible logs, metrics, and traces.
+  * Infrastructure: infrastructure-as-code and automated CI/CD.
+
+11. SECURITY, PRIVACY, AND CONTROL REQUIREMENTS
+
+Baseline security
+
+  * TLS everywhere, encryption at rest, KMS-managed keys, and secrets manager.
+  * MFA, secure sessions, rate limiting, CSRF protection, input validation, secure headers.
+  * Least-privilege cloud IAM and time-bound privileged support access.
+  * SAST, DAST, dependency/container scanning, patching, penetration testing, and vulnerability
+    management.
+  * No passwords, tokens, full bank accounts, government IDs, or payroll secrets in logs.
+  * Tenant identity in every request, job, event, cache key, file path, search query, and analytics
+    pipeline.
+
+Data governance
+
+  * Data classification for public, internal, confidential, personal, and highly sensitive data.
+  * Retention/deletion schedule per record type and jurisdiction.
+  * Legal holds, subject access/correction/export workflow, breach response, and subprocessor register.
+  * Data processing agreements and privacy impact assessments where appropriate.
+  * Data residency and cross-border processing assessment before launch.
+  * Named ownership for privacy, security, payroll compliance, and incident response.
+
+Nigeria-first assessment (if selected)
+
+The platform should be Africa-ready, but country-specific claims must be professionally validated.
+For a Nigeria launch, assess applicable Nigerian data protection obligations and payroll/statutory
+requirements, including PAYE, pension, and other relevant deductions and employer obligations. Isolate
+country rules in an effective-dated country pack; do not hardcode national rules throughout the core.
+
+Financial and payroll controls
+
+  * Decimal money arithmetic, explicit currencies, rounding and exchange-rate policy.
+  * Effective-dated tax/rule versions and reproducible calculation inputs.
+  * Payroll cut-off, preview, variance analysis, maker-checker, lock, publish, and reconciliation.
+  * Controlled bank export; before/after payment reconciliation.
+  * Reversal and adjustment instead of destructive edits to closed records.
+  * Segregation of vendor creation, PO approval, payment authorization, and bank-detail changes.
+  * Period close controls and access recertification.
+
+12. NON-FUNCTIONAL REQUIREMENTS
+
+Initial targets (to be validated during architecture and capacity planning):
+
+  Availability: 99.9% monthly for core SaaS.
+  Standard API reads: p95 under 500 ms under expected load.
+  Event delivery: at-least-once with idempotent consumers.
+  Tenant isolation: zero cross-tenant access in automated and independent security tests.
+  Recovery point objective: target 15 minutes or better.
+  Recovery time objective: target 1–4 hours initially.
+  Accessibility: WCAG 2.1 AA target.
+  Data export: documented, tenant-scoped, observable, and resumable for large tenants.
+  Auditability: 100% of defined sensitive actions recorded.
+  Payroll: 100% of runs reconciled before approval in pilot.
+
+Capacity testing must cover payroll-period peaks, workflow runs, documents, imports, exports,
+integrations, audit volume, concurrent administrators, large tenants, poor connectivity, and regional
+latency—not just employee count.
+
+13. DELIVERY ROADMAP AND PHASE GATES
+
+Phase 0 — Product framing and investment decision (2–4 weeks)
+
+Deliver: selected country, legal/compliance matrix, primary ICP and buyer, three design partners,
+initial module bundle, business model, regulatory assessment, feasibility assessment, and go/no-go.
+
+Gate: country and compliance owner selected; customer evidence supports the wedge; payroll and data
+protection risks have named owners; scope is small enough to build.
+
+Phase 1 — Discovery and service design (6–8 weeks)
+
+Map happy and exception paths for hire-to-pay, leave, payroll correction, requisition-to-purchase,
+receipt, asset assignment, offboarding, reporting, and subscription downgrade. Produce process maps,
+prototypes, PRDs, acceptance criteria, canonical data model, permission model, country payroll spec,
+threat model, control matrix, migration templates, and pilot hypotheses.
+
+Gate: customer and specialist sign-off on processes, backlog, controls, data model, and prototypes.
+
+Phase 2 — Platform foundation (8–12 weeks)
+
+Build tenant model, IAM, scoped permissions, entitlements, billing adapter, audit, workflows,
+notifications, documents, import framework, APIs, jobs, search, reporting foundation, observability,
+backup/recovery, admin console, and support tooling.
+
+Gate: safe tenant provisioning; automated cross-tenant tests; server-side permissions and entitlements;
+auditable sensitive actions; tested backups; observable/retryable jobs; critical workflow tests.
+
+Phase 3 — MVP modules (4–6 months)
+
+Build HR, limited one-country Payroll, Procurement, Expenses, Assets, and reports. Payroll starts
+with salaried employees, standard earnings/deductions, one or two frequencies, payslips, reports,
+approval/lock, bank export, correction/reversal, and audit.
+
+Gate: three design partners can complete target workflows; payroll calculation scenarios pass; data
+imports reconcile; no unresolved critical tenant/security defects; support can diagnose normal issues.
+
+Phase 4 — Controlled pilot (8–12 weeks)
+
+Use 3–5 customers with executive sponsor, implementation lead, migration owner, payroll SME, weekly
+review, rollback plan, and support escalation. Run payroll in parallel with the existing process for
+2–3 cycles and compare gross, taxable pay, deductions, net, employer cost, variances, bank totals,
+reports, and accounting reconciliation.
+
+Gate: 80%+ target workflows complete without engineering intervention; every payroll variance is
+explained; migration is signed off; no critical/high security issue remains; support targets hold.
+
+Phase 5 — General availability (target month 12–15)
+
+Require production support, SLOs, incident response, disaster recovery test, terms/privacy/DPA,
+onboarding playbooks, pricing, tested billing/cancellation/downgrade/refund flows, status page,
+release process, known-limitations documentation, and customer communications.
+
+Phase 6 — Expansion (after evidence)
+
+Add advanced expenses/procurement, accounting integrations, budgeting, mobile, performance,
+recruitment, Inventory, and a second country only after stability, retention, supportability, and
+gross-margin evidence. POS gets its own discovery/certification track for offline, hardware,
+payments, cash, inventory, security, and PCI concerns.
+
+14. TEAM AND OPERATING MODEL
+
+MVP team (indicative 14–20 people)
+
+  * Product/program: product lead, PM, BA/product operations, delivery lead, 1–2 designers.
+  * Engineering: architect/tech lead, 4–6 backend, 2–3 frontend, platform/DevOps, data/integration.
+  * Quality/control: 2 QA, automation, security specialist, payroll/financial-controls specialist.
+  * Operations: implementation lead, customer support lead, enablement/documentation.
+
+Payroll, finance controls, privacy, and security expertise must be embedded before implementation,
+not added during final testing.
+
+Governance forums
+
+  Product Steering Committee: scope, funding, launch, market expansion, risk acceptance.
+  Architecture Review Board: domain boundaries, data, security, reliability, build/buy decisions.
+  Compliance and Controls Committee: payroll rules, statutory changes, access, audit, retention,
+    reconciliation, and control failures.
+  Release Readiness Review: product, engineering, QA, security, operations, and payroll-control signoff.
+
+Each module must maintain: owner, API contract, data ownership statement, permissions, entitlements,
+workflow definitions, event catalog, audit requirements, retention, dashboards, runbook, threat model,
+and test strategy.
+
+Customer onboarding
+
+  1. Contract/subscription setup
+  2. Tenant configuration
+  3. Role and approval design
+  4. Trial migration and reconciliation
+  5. User training
+  6. Payroll parallel run
+  7. Go-live readiness review
+  8. Hypercare
+  9. Success review
+
+Support tiers
+
+  Tier 1: guidance, configuration, imports, basic troubleshooting.
+  Tier 2: workflow, integration, data, and permission issues.
+  Tier 3: payroll defects, security incidents, corruption, outages, engineering defects.
+
+Payroll and security incidents require expedited escalation and protected payroll-period coverage.
+
+15. DATA MIGRATION STRATEGY
+
+Stages
+
+  1. Inventory source systems and data owners.
+  2. Map to canonical One Page model.
+  3. Build transformations and templates.
+  4. Run trial migration.
+  5. Validate counts, duplicates, exceptions, and totals.
+  6. Obtain customer sign-off.
+  7. Run final migration and freeze/reconcile source changes.
+  8. Perform post-migration verification and retain evidence.
+
+Payroll reconciliation must cover employee count, gross, deductions, employer costs, net, year-to-date
+values, statutory balances, and bank totals. Spreadsheet imports must be validated and approved before
+they can affect payroll; no unvalidated upload may execute a payroll run.
+
+16. QA, RELEASE, AND DISASTER RECOVERY
+
+Test layers
+
+  * Unit: payroll rules, money/rounding, entitlements, permissions, dates/time zones.
+  * Integration: billing, identity, files, notifications, banking, accounting, imports/exports.
+  * Contract: public APIs, internal module interfaces, webhooks, country packs.
+  * End-to-end: hire-to-pay, leave, requisition-to-PO, PO-to-asset, payroll-to-export,
+    subscription-to-entitlement, termination-to-access removal.
+  * Non-functional: isolation, load, security, accessibility, recovery, failure/retry, offline later.
+
+Release controls
+
+  * Peer review, automated CI, migration review, feature flags, staged rollout, rollback plan,
+    release notes, monitoring, and post-release review.
+  * Payroll rules use effective dates and controlled releases; historical calculations never change.
+
+Recovery
+
+  * Point-in-time backups, encrypted backup copies, documented RPO/RTO, restoration tests at least
+    quarterly, disaster runbooks, and customer communication procedures.
+  * A failed payroll or migration requires a correction/rollback plan, not ordinary feature rollback.
+
+17. SUCCESS METRICS
+
+North-star metric
+  Percentage of a customer's recurring people-and-money processes completed in One Page with a
+  complete audit trail.
+
+Activation
+
+  * Organization configured
+  * First employee imported
+  * First workflow created
+  * First leave/expense/purchase request completed
+  * First payroll run completed in parallel
+  * First report exported
+
+Product and quality
+
+  * Employee self-service adoption
+  * Two-or-more-module adoption
+  * Workflow completion rate and approval time
+  * Payroll processing time and reconciliation variance
+  * Migration exception rate
+  * Sensitive-action audit completeness
+  * Failed job, API error, uptime, and restore success rate
+
+Commercial
+
+  * Trial-to-paid conversion
+  * MRR/ARR, average revenue per organization
+  * Gross retention, net retention, churn, expansion revenue
+  * Customer acquisition cost and payback
+  * Implementation time and support tickets per customer
+  * Module attach rate and gross margin by plan
+
+Suggested pilot targets
+
+  * 99.9% core availability
+  * Zero unresolved critical security defects
+  * 100% payroll runs reconciled before approval
+  * 100% defined sensitive actions auditable
+  * Less than 1% post-signoff migration correction rate
+  * 90%+ core workflow completion without support intervention
+
+18. PRINCIPAL RISKS AND MITIGATIONS
+
+Overbuilding an ERP
+  Mitigation: one ICP, one country, one wedge; expansion requires evidence.
+
+Payroll error or regulatory non-compliance
+  Mitigation: local specialist ownership, versioned rules, parallel runs, reconciliation, lock,
+  maker-checker, controlled corrections, and effective dates.
+
+Tenant data leak
+  Mitigation: explicit isolation strategy, tenant-aware access everywhere, automated isolation tests,
+  encryption, support-access controls, backup isolation, and independent security testing.
+
+Weak authorization
+  Mitigation: scoped/attribute-based permissions, field sensitivity, segregation of duties, access
+  reviews, self-approval prevention, and time-bound delegation.
+
+Migration failure
+  Mitigation: templates, trial imports, exception/reconciliation reports, customer sign-off, rollback.
+
+Subscription changes break historical access
+  Mitigation: immutable plan versions, read-only historical access, export, grace periods, and audit.
+
+Generic shared services create coupling
+  Mitigation: module ownership, bounded contracts, schema boundaries, event conventions, architecture
+  tests, and explicit extraction criteria.
+
+Integration failure
+  Mitigation: adapters, retries, replay, dead letters, mapping validation, health visibility,
+  reconciliation, and manual fallback.
+
+POS complexity
+  Mitigation: defer; give POS a separate discovery, certification, offline, device, and payment track.
+
+Customization becomes unprofitable services
+  Mitigation: configurable policies and workflows with strict limits on bespoke code.
+
+19. IMMEDIATE NEXT 30 DAYS
+
+  1. Select launch country and document the legal/compliance operating model.
+  2. Select the primary ICP, buyer, and measurable first-year outcome.
+  3. Recruit three design-partner organizations.
+  4. Appoint product, technical, payroll, finance-control, security, privacy, and implementation owners.
+  5. Confirm MVP bundle and write the scope baseline.
+  6. Map hire-to-pay and requisition-to-purchase, including exception paths.
+  7. Define tenant, legal entity, employee, money, payroll-period, and authorization models.
+  8. Create the first entitlement catalog, plan versions, downgrade states, and pricing hypotheses.
+  9. Prototype the highest-risk workflows and validate with design partners.
+  10. Complete payroll, data-protection, threat, migration, and recovery assessments.
+  11. Define pilot exit criteria and payroll parallel-run controls.
+  12. Establish architecture, compliance, release, and incident review forums.
+
+20. FINAL PRODUCT PRINCIPLE
+
+One Page should scale by adding well-bounded modules to a trusted control platform. The product will
+win less by launching the most modules and more by being accurate, secure, auditable, easy to adopt,
+and dependable during the customer’s most important recurring processes.
+
+Recommended sequence:
+
+  1. Select country, ICP, buyer, and design partners.
+  2. Build tenancy, identity, entitlements, workflows, audit, and migration foundations.
+  3. Win trust through HR, one-country Payroll, and controlled approvals.
+  4. Add expenses, procurement depth, assets, accounting integrations, and Inventory.
+  5. Add POS and vertical modules only after evidence supports the investment.
+  6. Preserve clean ownership, effective-dated rules, customer exit rights, and reliable controls.
