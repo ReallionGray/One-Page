@@ -1,7 +1,7 @@
 ---
 id: platform-002
 scope: platform persistence and organization model
-status: ready
+status: done
 depends-on: [platform-001]
 ---
 

@@ -12,3 +12,6 @@ current task.
 - Add billing provider adapters after pricing and payment jurisdiction are selected.
 - Harden `EntitlementKey` construction so unsupported namespaces cannot bypass the typed catalog.
 - Make runtime entitlement updates concurrency-safe when persistence/subscription updates are introduced.
+- Add database-level tenant isolation defense-in-depth (for example PostgreSQL RLS) beyond repository checks.
+- Add a tenant-scoped membership update command and cross-tenant update tests.
+- Remediate or formally risk-accept the high-severity `SQLitePCLRaw.lib.e_sqlite3` test dependency warning.
