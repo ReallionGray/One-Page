@@ -10,3 +10,5 @@ current task.
 - Define workflow engine contract and approval-specific UX.
 - Define full audit retention, export, and tamper-detection requirements.
 - Add billing provider adapters after pricing and payment jurisdiction are selected.
+- Harden `EntitlementKey` construction so unsupported namespaces cannot bypass the typed catalog.
+- Make runtime entitlement updates concurrency-safe when persistence/subscription updates are introduced.

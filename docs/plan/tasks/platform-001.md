@@ -1,7 +1,7 @@
 ---
 id: platform-001
 scope: platform foundation
-status: ready
+status: done
 depends-on: []
 ---
 
