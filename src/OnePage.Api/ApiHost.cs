@@ -12,11 +12,16 @@ public static class ApiHost
         builder.Services.AddSingleton<InMemoryEntitlementEvaluator>();
         builder.Services.AddSingleton<IEntitlementEvaluator>(sp => sp.GetRequiredService<InMemoryEntitlementEvaluator>());
         builder.Services.AddSingleton<ITrustedApiCredentialResolver, ConfigurationApiCredentialResolver>();
-        builder.Services.AddDbContext<OrganizationDbContext>(options => options.UseNpgsql(builder.Configuration.GetConnectionString("OnePage") ?? "Host=localhost;Database=onepage;Username=postgres;Password=postgres"));
+        if (string.Equals(builder.Configuration["OnePage:DatabaseProvider"], "sqlite", StringComparison.OrdinalIgnoreCase))
+            builder.Services.AddDbContext<OrganizationDbContext>(options => options.UseSqlite(builder.Configuration.GetConnectionString("OnePage") ?? "Data Source=onepage.db"));
+        else
+            builder.Services.AddDbContext<OrganizationDbContext>(options => options.UseNpgsql(builder.Configuration.GetConnectionString("OnePage") ?? "Host=localhost;Database=onepage;Username=postgres;Password=postgres"));
         builder.Services.AddScoped<TenantContextAccessor>();
         builder.Services.AddScoped<ITenantContextAccessor>(sp => sp.GetRequiredService<TenantContextAccessor>());
         builder.Services.AddScoped<ITenantRepository, TenantRepository>();
         builder.Services.AddScoped<IOrganizationRepository, OrganizationRepository>();
+        builder.Services.AddScoped<IAuthorizationRepository, AuthorizationRepository>();
+        builder.Services.AddScoped<IAuthorizationEvaluator, ScopedAuthorizationEvaluator>();
         var app = builder.Build();
         app.Use(async (httpContext, next) =>
         {
@@ -58,6 +63,7 @@ public static class ApiHost
         app.MapGet("/api/v1/platform/entitlements/{namespace}/{*name}", CheckEntitlement);
         app.MapGet("/api/v1/platform/organization/branches/{id}", async (string id, IOrganizationRepository repository, CancellationToken ct) => Results.Ok(await repository.GetAsync<Branch>(id, ct)));
         app.MapGet("/api/v1/platform/context", (ITenantContextAccessor accessor) => Results.Ok(accessor.Current));
+        app.MapGet("/api/v1/platform/authorize/{*permission}", Authorize);
         return app;
     }
 
@@ -86,5 +92,19 @@ public static class ApiHost
         {
             return Results.Problem(statusCode: 400, title: "Invalid tenant context", detail: ex.Message);
         }
+    }
+
+    private static async Task<IResult> Authorize(string permission, ITenantContextAccessor accessor, IAuthorizationEvaluator evaluator, HttpRequest request, CancellationToken cancellationToken)
+    {
+        try
+        {
+            var context = accessor.Current ?? throw new TenantContextValidationException("tenantContext", "A tenant context is required.");
+            var amount = decimal.TryParse(request.Query["amount"], out var parsedAmount) ? parsedAmount : (decimal?)null;
+            var managerChain = request.Query["managerChain"].FirstOrDefault()?.Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries).ToHashSet(StringComparer.Ordinal);
+            var scope = new AuthorizationScope(request.Query["legalEntityId"], request.Query["branchId"], request.Query["departmentId"], request.Query["locationId"], managerChain);
+            var decision = await evaluator.AuthorizeAsync(new AuthorizationRequest(context, PermissionCatalog.Create(permission), scope, amount, request.Query["currency"]), cancellationToken);
+            return decision.Allowed ? Results.Ok(decision) : Results.Problem(statusCode: 403, title: "Authorization denied", detail: "The requested action is not authorized.", extensions: new Dictionary<string, object?> { ["code"] = "AUTHORIZATION_DENIED", ["denialReason"] = decision.DenialReason?.ToString() });
+        }
+        catch (ArgumentException ex) { return Results.Problem(statusCode: 400, title: "Invalid authorization request", detail: ex.Message); }
     }
 }

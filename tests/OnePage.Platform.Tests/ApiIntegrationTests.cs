@@ -66,6 +66,33 @@ public class ApiIntegrationTests
     }
 
     [Fact]
+    public async Task Api_authorization_endpoint_enforces_persisted_membership_and_permission()
+    {
+        var path = Path.Combine(Path.GetTempPath(), $"onepage-platform003-{Guid.NewGuid():N}.db");
+        await using var host = await StartHost(path);
+        await using (var scope = host.App.Services.CreateAsyncScope())
+        {
+            var db = scope.ServiceProvider.GetRequiredService<OrganizationDbContext>();
+            await db.Tenants.AddAsync(new Tenant("tenant-1", "Acme"));
+            await db.UserMemberships.AddAsync(new UserMembership("membership-1", "tenant-1", "user-1"));
+            await db.Roles.AddAsync(new Role("role-1", "tenant-1", "Finance"));
+            await db.RolePermissions.AddAsync(new RolePermission("permission-1", "tenant-1", "role-1", PermissionCatalog.ReportExport));
+            await db.MembershipRoleAssignments.AddAsync(new MembershipRoleAssignment("assignment-1", "tenant-1", "membership-1", "role-1"));
+            await db.SaveChangesAsync();
+        }
+        using var allowed = new HttpRequestMessage(HttpMethod.Get, "/api/v1/platform/authorize/report.export");
+        allowed.Headers.Add("X-API-Key", "key-1"); allowed.Headers.Add("X-Tenant-Id", "tenant-1");
+        using var allowedResponse = await host.Client.SendAsync(allowed);
+        Assert.Equal(HttpStatusCode.OK, allowedResponse.StatusCode);
+
+        using var denied = new HttpRequestMessage(HttpMethod.Get, "/api/v1/platform/authorize/payroll.run");
+        denied.Headers.Add("X-API-Key", "key-1"); denied.Headers.Add("X-Tenant-Id", "tenant-1");
+        var deniedResponse = await host.Client.SendAsync(denied);
+        Assert.Equal(HttpStatusCode.Forbidden, deniedResponse.StatusCode);
+        Assert.Contains(nameof(AuthorizationDenialReason.MissingPermission), await deniedResponse.Content.ReadAsStringAsync());
+    }
+
+    [Fact]
     public async Task Startup_initializer_uses_registered_database_context()
     {
         await using var connection = new Microsoft.Data.Sqlite.SqliteConnection("Data Source=:memory:");
@@ -77,12 +104,16 @@ public class ApiIntegrationTests
         Assert.True(await provider.GetRequiredService<OrganizationDbContext>().Database.CanConnectAsync());
     }
 
-    private static async Task<RunningHost> StartHost()
+    private static Task<RunningHost> StartHost() => StartHost(null);
+
+    private static async Task<RunningHost> StartHost(string? sqlitePath)
     {
         var app = ApiHost.Create(configureBuilder: builder => builder.Configuration.AddInMemoryCollection(new Dictionary<string, string?>
         {
             ["OnePage:ApiCredentials:key-1:UserId"] = "user-1",
-            ["OnePage:ApiCredentials:key-1:TenantIds:0"] = "tenant-1"
+            ["OnePage:ApiCredentials:key-1:TenantIds:0"] = "tenant-1",
+            ["OnePage:DatabaseProvider"] = sqlitePath is null ? null : "sqlite",
+            ["ConnectionStrings:OnePage"] = sqlitePath is null ? null : $"Data Source={sqlitePath}"
         }));
         using var listener = new TcpListener(System.Net.IPAddress.Loopback, 0);
         listener.Start();
@@ -91,12 +122,14 @@ public class ApiIntegrationTests
         app.Urls.Add($"http://127.0.0.1:{port}");
         await app.StartAsync();
         var address = app.Urls.First();
-        return new RunningHost(app, new HttpClient { BaseAddress = new Uri(address) });
+        if (sqlitePath is not null) await ApiHost.InitializeDatabaseAsync(app.Services);
+        return new RunningHost(app, new HttpClient { BaseAddress = new Uri(address) }, sqlitePath);
     }
 
-    private sealed class RunningHost(WebApplication app, HttpClient client) : IAsyncDisposable
+    private sealed class RunningHost(WebApplication app, HttpClient client, string? sqlitePath) : IAsyncDisposable
     {
+        public WebApplication App { get; } = app;
         public HttpClient Client { get; } = client;
-        public async ValueTask DisposeAsync() { Client.Dispose(); await app.StopAsync(); await app.DisposeAsync(); }
+        public async ValueTask DisposeAsync() { Client.Dispose(); await app.StopAsync(); await app.DisposeAsync(); if (sqlitePath is not null && File.Exists(sqlitePath)) File.Delete(sqlitePath); }
     }
 }
