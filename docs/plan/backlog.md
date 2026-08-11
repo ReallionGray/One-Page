@@ -15,3 +15,5 @@ current task.
 - Add database-level tenant isolation defense-in-depth (for example PostgreSQL RLS) beyond repository checks.
 - Add a tenant-scoped membership update command and cross-tenant update tests.
 - Remediate or formally risk-accept the high-severity `SQLitePCLRaw.lib.e_sqlite3` test dependency warning.
+- Add currency-aware amount limits to authorization decisions before multi-currency approvals.
+- Add database constraints/foreign keys for role-permission and membership-role relationship integrity.

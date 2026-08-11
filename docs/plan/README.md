@@ -24,7 +24,7 @@ and verification are separate activities.
 |---|---|---|---|
 | platform-001 | Solution bootstrap, tenant context, entitlement contract | done | — |
 | platform-002 | Persistent tenant and organization model | done | platform-001 |
-| platform-003 | Permission catalog and scoped authorization | ready | platform-002 |
+| platform-003 | Permission catalog and scoped authorization | done | platform-002 |
 | platform-004 | Versioned workflows and approval execution | pending | platform-002, platform-003 |
 | platform-005 | Append-only audit service | pending | platform-001, platform-002 |
 | platform-006 | Billing, plan versions, subscriptions, and usage | pending | platform-002, platform-001 |

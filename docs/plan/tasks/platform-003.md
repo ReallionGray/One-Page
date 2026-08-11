@@ -1,7 +1,7 @@
 ---
 id: platform-003
 scope: platform authorization
-status: ready
+status: done
 depends-on: [platform-002]
 ---
 
