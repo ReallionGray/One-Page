@@ -30,7 +30,7 @@ and verification are separate activities.
 | platform-006 | Billing, plan versions, subscriptions, and usage | pending | platform-002, platform-001 |
 | platform-007 | Documents, notifications, search, and import/export | pending | platform-002, platform-005 |
 | platform-008 | Reporting read models and integration hub | pending | platform-004, platform-005 |
-| hr-001 | HR employee and organization module | pending | platform-002, platform-003 |
+| hr-001 | HR employee and organization module | ready | platform-002, platform-003 |
 | payroll-001 | Launch-country payroll specification and engine | blocked pending country decision | hr-001, platform-004, platform-005 |
 | procurement-001 | Procurement and purchase-to-receipt module | pending | platform-004, platform-005, platform-007 |
 | expense-001 | Expense policy, claims, and reimbursement module | pending | platform-004, platform-005, platform-007 |

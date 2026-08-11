@@ -8,6 +8,8 @@ implementation contracts and executable delivery tasks.
 
 - [Platform scope](platform/README.md): tenant context, identity/authorization boundaries,
   entitlements, workflows, audit, billing, files, notifications, and integration rules.
+- [HR scope](hr/README.md): employee lifecycle, employment records, organization placement, leave,
+  attendance inputs, documents, onboarding, and offboarding.
 - [Delivery plan](plan/README.md): task status, dependencies, analysis, reviews, and backlog.
 
 ## Working rules
