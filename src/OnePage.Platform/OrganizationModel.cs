@@ -74,6 +74,7 @@ public sealed class OrganizationDbContext(DbContextOptions<OrganizationDbContext
     public DbSet<MembershipRoleAssignment> MembershipRoleAssignments => Set<MembershipRoleAssignment>();
     public DbSet<AuditEvent> AuditEvents => Set<AuditEvent>();
     public DbSet<Asset> Assets => Set<Asset>();
+    public DbSet<ApprovalRequest> ApprovalRequests => Set<ApprovalRequest>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -85,8 +86,9 @@ public sealed class OrganizationDbContext(DbContextOptions<OrganizationDbContext
         modelBuilder.Entity<Role>(e => { e.HasKey(x => x.Id); e.HasIndex(x => new { x.TenantId, x.Name }).IsUnique(); e.Property(x => x.Id).HasMaxLength(128); e.Property(x => x.TenantId).HasMaxLength(128).IsRequired(); e.Property(x => x.Name).HasMaxLength(256).IsRequired(); });
         modelBuilder.Entity<RolePermission>(e => { e.HasKey(x => x.Id); e.HasIndex(x => new { x.TenantId, x.RoleId, x.Permission }).IsUnique(); e.Property(x => x.Id).HasMaxLength(128); e.Property(x => x.TenantId).HasMaxLength(128).IsRequired(); e.Property(x => x.RoleId).HasMaxLength(128).IsRequired(); e.Property(x => x.Permission).HasMaxLength(256).IsRequired(); });
         modelBuilder.Entity<MembershipRoleAssignment>(e => { e.HasKey(x => x.Id); e.HasIndex(x => new { x.TenantId, x.MembershipId, x.RoleId }); e.Property(x => x.Id).HasMaxLength(128); e.Property(x => x.TenantId).HasMaxLength(128).IsRequired(); e.Property(x => x.MembershipId).HasMaxLength(128).IsRequired(); e.Property(x => x.RoleId).HasMaxLength(128).IsRequired(); e.Property(x => x.AmountLimit).HasPrecision(18, 2); e.Property(x => x.Currency).HasMaxLength(16); });
-        modelBuilder.Entity<AuditEvent>(e => { e.HasKey(x => x.Id); e.HasIndex(x => new { x.TenantId, x.CorrelationId }); e.Property(x => x.Id).HasMaxLength(128); e.Property(x => x.TenantId).HasMaxLength(128).IsRequired(); e.Property(x => x.ActorUserId).HasMaxLength(128).IsRequired(); e.Property(x => x.Action).HasMaxLength(128).IsRequired(); e.Property(x => x.ResourceType).HasMaxLength(128).IsRequired(); e.Property(x => x.ResourceId).HasMaxLength(128); e.Property(x => x.CorrelationId).HasMaxLength(128).IsRequired(); e.Property(x => x.CreatedAt).IsRequired(); });
+        modelBuilder.Entity<AuditEvent>(e => { e.HasKey(x => x.Id); e.HasIndex(x => new { x.TenantId, x.CorrelationId }); e.Property(x => x.Id).HasMaxLength(128); e.Property(x => x.TenantId).HasMaxLength(128).IsRequired(); e.Property(x => x.ActorUserId).HasMaxLength(128).IsRequired(); e.Property(x => x.Action).HasMaxLength(128).IsRequired(); e.Property(x => x.ResourceType).HasMaxLength(128).IsRequired(); e.Property(x => x.ResourceId).HasMaxLength(128); e.Property(x => x.CorrelationId).HasMaxLength(128).IsRequired(); e.Property(x => x.CreatedAt).IsRequired(); e.Property(x => x.PrevHash).HasMaxLength(128); e.Property(x => x.Hash).HasMaxLength(128); });
         modelBuilder.Entity<Asset>(e => { e.HasKey(x => x.Id); e.HasIndex(x => new { x.TenantId, x.Tag }).IsUnique(); e.Property(x => x.Id).HasMaxLength(128); e.Property(x => x.TenantId).HasMaxLength(128).IsRequired(); e.Property(x => x.Tag).HasMaxLength(128).IsRequired(); e.Property(x => x.Name).HasMaxLength(256).IsRequired(); e.Property(x => x.CustodianEmployeeId).HasMaxLength(128); e.Property(x => x.LocationId).HasMaxLength(128); e.Property(x => x.Status).HasMaxLength(64).IsRequired(); e.Property(x => x.CreatedAt).IsRequired(); e.Property(x => x.UpdatedAt).IsRequired(false); });
+        modelBuilder.Entity<ApprovalRequest>(e => { e.HasKey(x => x.Id); e.HasIndex(x => new { x.TenantId, x.Status }); e.Property(x => x.Id).HasMaxLength(128); e.Property(x => x.TenantId).HasMaxLength(128).IsRequired(); e.Property(x => x.RequestedBy).HasMaxLength(128).IsRequired(); e.Property(x => x.ResourceType).HasMaxLength(128).IsRequired(); e.Property(x => x.ResourceId).HasMaxLength(128); e.Property(x => x.Status).HasMaxLength(32).IsRequired(); e.Property(x => x.CreatedAt).IsRequired(); });
     }
 
     private static void ConfigureOwned<T>(ModelBuilder modelBuilder) where T : TenantOwnedRecord
@@ -146,6 +148,53 @@ public sealed class Asset
     }
 }
 
+public sealed class ApprovalRequest
+{
+    private ApprovalRequest() { }
+
+    public ApprovalRequest(string id, string tenantId, string resourceType, string resourceId, string requestedBy, string reason)
+    {
+        Id = Tenant.Required(id, nameof(id), "Approval request ID is required.");
+        TenantId = Tenant.Required(tenantId, nameof(tenantId), "Tenant ID is required.");
+        ResourceType = Tenant.Required(resourceType, nameof(resourceType), "Resource type is required.");
+        ResourceId = resourceId;
+        RequestedBy = Tenant.Required(requestedBy, nameof(requestedBy), "Requester user ID is required.");
+        Reason = reason;
+        Status = "pending";
+        CreatedAt = DateTimeOffset.UtcNow;
+    }
+
+    public string Id { get; private set; } = null!;
+    public string TenantId { get; private set; } = null!;
+    public string ResourceType { get; private set; } = null!;
+    public string? ResourceId { get; private set; }
+    public string RequestedBy { get; private set; } = null!;
+    public string? Reason { get; private set; }
+    public string Status { get; private set; } = null!; // pending | approved | rejected
+    public string? DecidedBy { get; private set; }
+    public string? DecisionComment { get; private set; }
+    public DateTimeOffset CreatedAt { get; private set; }
+    public DateTimeOffset? DecidedAt { get; private set; }
+
+    public void Approve(string approverUserId, string? comment)
+    {
+        if (string.Equals(approverUserId, RequestedBy, StringComparison.Ordinal)) throw new ArgumentException("Self-approval is not allowed.");
+        DecidedBy = Tenant.Required(approverUserId, nameof(approverUserId), "Approver user ID is required.");
+        DecisionComment = comment;
+        Status = "approved";
+        DecidedAt = DateTimeOffset.UtcNow;
+    }
+
+    public void Reject(string approverUserId, string? comment)
+    {
+        if (string.Equals(approverUserId, RequestedBy, StringComparison.Ordinal)) throw new ArgumentException("Self-approval is not allowed.");
+        DecidedBy = Tenant.Required(approverUserId, nameof(approverUserId), "Approver user ID is required.");
+        DecisionComment = comment;
+        Status = "rejected";
+        DecidedAt = DateTimeOffset.UtcNow;
+    }
+}
+
 public sealed class AuditEvent
 {
     private AuditEvent() { }
@@ -178,6 +227,8 @@ public sealed class AuditEvent
     public string? Source { get; private set; }
     public string? UserAgent { get; private set; }
     public DateTimeOffset CreatedAt { get; private set; }
+    public string? PrevHash { get; private set; }
+    public string? Hash { get; private set; }
 }
 
 public sealed class OrganizationValidationException : ArgumentException

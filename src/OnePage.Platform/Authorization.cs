@@ -29,6 +29,7 @@ public static class PermissionCatalog
     public static readonly PermissionKey AssetAssign = new("asset.assign");
     public static readonly PermissionKey AssetTransfer = new("asset.transfer");
     public static readonly PermissionKey AssetDispose = new("asset.dispose");
+    public static readonly PermissionKey ApprovalReview = new("approval.review");
 
     public static PermissionKey Create(string action) => new(action);
 }

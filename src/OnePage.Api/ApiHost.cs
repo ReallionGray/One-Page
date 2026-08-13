@@ -24,6 +24,7 @@ public static class ApiHost
         builder.Services.AddScoped<IAuthorizationEvaluator, ScopedAuthorizationEvaluator>();
         builder.Services.AddScoped<IAuditRepository, AuditRepository>();
         builder.Services.AddScoped<IAssetsRepository, AssetsRepository>();
+        builder.Services.AddScoped<IApprovalRepository, ApprovalRepository>();
         var app = builder.Build();
         app.Use(async (httpContext, next) =>
         {
@@ -100,6 +101,7 @@ public static class ApiHost
         app.MapGet("/api/v1/platform/authorize/{*permission}", Authorize);
 
         MapAssetEndpoints(app);
+        MapApprovalEndpoints(app);
         return app;
     }
 
@@ -140,14 +142,20 @@ public static class ApiHost
             return Results.Ok(asset);
         });
 
-        app.MapPost("/api/v1/assets/{id}/dispose", async (string id, DisposeAssetCommand c, ITenantContextAccessor ctx, IAuthorizationEvaluator auth, IEntitlementEvaluator ent, IAssetsRepository repo, IAuditRepository audit, CancellationToken ct) =>
+        app.MapPost("/api/v1/assets/{id}/dispose", async (string id, DisposeAssetCommand c, ITenantContextAccessor ctx, IAuthorizationEvaluator auth, IEntitlementEvaluator ent, IAssetsRepository repo, IAuditRepository audit, IApprovalRepository approvals, CancellationToken ct) =>
         {
             var current = ctx.Current ?? throw new TenantContextValidationException("tenantContext", "A tenant context is required.");
             if (!ent.Evaluate(current, EntitlementKeys.Modules.Assets).Allowed) return Results.Problem(statusCode: 403, title: "Assets module unavailable", detail: "The Assets module is not enabled for this subscription.");
             var asset = await repo.GetAsync(id, ct);
             if (asset is null) return Results.NotFound();
             var decision = await auth.AuthorizeAsync(new AuthorizationRequest(current, PermissionCatalog.AssetDispose, new AuthorizationScope(null, null, null, asset.LocationId)));
-            if (!decision.Allowed) return Results.Problem(statusCode: 403, title: "Authorization denied", detail: "Not authorized to dispose asset.", extensions: new Dictionary<string, object?> { ["denialReason"] = decision.DenialReason?.ToString() });
+            if (!decision.Allowed)
+            {
+                // Create approval request for disposal
+                var req = await approvals.CreateAsync(new OnePage.Platform.ApprovalRequest(Guid.NewGuid().ToString("N"), current.TenantId, "asset.dispose", asset.Id, current.UserId, c.Reason), ct);
+                await audit.AddAsync(new OnePage.Platform.AuditEvent(Guid.NewGuid().ToString("N"), current.TenantId, current.UserId, $"asset.dispose.request:{asset.Id}", "approval", req.Id, null, null, current.CorrelationId, null, null), ct);
+                return Results.Accepted($"/api/v1/approvals/{req.Id}", new { approvalId = req.Id });
+            }
             asset.Dispose(current.UserId);
             await repo.UpdateAsync(asset, ct);
             await audit.AddAsync(new OnePage.Platform.AuditEvent(Guid.NewGuid().ToString("N"), current.TenantId, current.UserId, $"asset.dispose:{asset.Id}", "asset", asset.Id, null, null, current.CorrelationId, null, null), ct);
@@ -158,6 +166,66 @@ public static class ApiHost
     public record CreateAssetCommand(string Id, string Tag, string Name, string? Description, string? LocationId, string? CustodianEmployeeId, string? LegalEntityId, string? BranchId, string? DepartmentId);
     public record AssignAssetCommand(string EmployeeId);
     public record DisposeAssetCommand(string Reason);
+    public record DecideApprovalCommand(bool Approve, string? Comment);
+
+    private static void MapApprovalEndpoints(WebApplication app)
+    {
+        app.MapGet("/api/v1/approvals/{id}", async (string id, ITenantContextAccessor ctx, IApprovalRepository approvals, CancellationToken ct) =>
+        {
+            var current = ctx.Current ?? throw new TenantContextValidationException("tenantContext", "A tenant context is required.");
+            var req = await approvals.GetAsync(id, ct);
+            if (req is null) return Results.NotFound();
+            if (!string.Equals(req.TenantId, current.TenantId, StringComparison.Ordinal)) return Results.Problem(statusCode: 403, title: "Cross-tenant", detail: "Request does not belong to current tenant.");
+            return Results.Ok(req);
+        });
+
+        app.MapPost("/api/v1/approvals/{id}/decide", async (string id, DecideApprovalCommand c, ITenantContextAccessor ctx, IApprovalRepository approvals, IAuthorizationEvaluator auth, IEntitlementEvaluator ent, IAuditRepository audit, IAssetsRepository assets, CancellationToken ct) =>
+        {
+            var current = ctx.Current ?? throw new TenantContextValidationException("tenantContext", "A tenant context is required.");
+            var req = await approvals.GetAsync(id, ct);
+            if (req is null) return Results.NotFound();
+            if (req.TenantId != current.TenantId) return Results.Problem(statusCode: 403, title: "Cross-tenant", detail: "Request does not belong to current tenant.");
+            var decisionAuth = await auth.AuthorizeAsync(new AuthorizationRequest(current, PermissionCatalog.ApprovalReview));
+            if (!decisionAuth.Allowed) return Results.Problem(statusCode: 403, title: "Authorization denied", detail: "Not authorized to decide approvals.");
+            try
+            {
+                if (c.Approve)
+                {
+                    req.Approve(current.UserId, c.Comment);
+                    await approvals.UpdateAsync(req, ct);
+                    await audit.AddAsync(new OnePage.Platform.AuditEvent(Guid.NewGuid().ToString("N"), current.TenantId, current.UserId, $"approval.approve:{req.Id}", "approval", req.Id, null, null, current.CorrelationId, null, null), ct);
+                    if (req.ResourceType == "asset.dispose" && !string.IsNullOrWhiteSpace(req.ResourceId))
+                    {
+                        var asset = await assets.GetAsync(req.ResourceId, ct);
+                        if (asset is not null)
+                        {
+                            asset.Dispose(current.UserId);
+                            await assets.UpdateAsync(asset, ct);
+                            await audit.AddAsync(new OnePage.Platform.AuditEvent(Guid.NewGuid().ToString("N"), current.TenantId, current.UserId, $"asset.dispose:approved:{asset.Id}", "asset", asset.Id, null, null, current.CorrelationId, null, null), ct);
+                        }
+                    }
+                    return Results.Ok(req);
+                }
+                else
+                {
+                    req.Reject(current.UserId, c.Comment);
+                    await approvals.UpdateAsync(req, ct);
+                    await audit.AddAsync(new OnePage.Platform.AuditEvent(Guid.NewGuid().ToString("N"), current.TenantId, current.UserId, $"approval.reject:{req.Id}", "approval", req.Id, null, null, current.CorrelationId, null, null), ct);
+                    return Results.Ok(req);
+                }
+            }
+            catch (ArgumentException ex) { return Results.Problem(statusCode: 400, title: "Invalid approval decision", detail: ex.Message); }
+        });
+
+        app.MapGet("/api/v1/platform/audit/export", async (ITenantContextAccessor ctx, IAuditRepository audit, IAuthorizationEvaluator auth, CancellationToken ct) =>
+        {
+            var current = ctx.Current ?? throw new TenantContextValidationException("tenantContext", "A tenant context is required.");
+            var decision = await auth.AuthorizeAsync(new AuthorizationRequest(current, PermissionCatalog.ReportExport));
+            if (!decision.Allowed) return Results.Problem(statusCode: 403, title: "Authorization denied", detail: "Not authorized to export audit logs.");
+            var events = await audit.ExportTenantEventsAsync(current.TenantId, ct);
+            return Results.Ok(events);
+        });
+    }
 
 
     public static async Task InitializeDatabaseAsync(IServiceProvider services, CancellationToken cancellationToken = default)
