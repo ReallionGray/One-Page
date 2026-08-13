@@ -22,6 +22,7 @@ public static class ApiHost
         builder.Services.AddScoped<IOrganizationRepository, OrganizationRepository>();
         builder.Services.AddScoped<IAuthorizationRepository, AuthorizationRepository>();
         builder.Services.AddScoped<IAuthorizationEvaluator, ScopedAuthorizationEvaluator>();
+        builder.Services.AddScoped<IAuditRepository, AuditRepository>();
         var app = builder.Build();
         app.Use(async (httpContext, next) =>
         {
@@ -59,6 +60,38 @@ public static class ApiHost
             accessor.Current = TenantContext.Create(credential.UserId, tenantId, httpContext.Request.Headers["X-Correlation-Id"].FirstOrDefault() ?? Guid.NewGuid().ToString("N"));
             await next(httpContext);
         });
+
+        // Audit middleware: records tenant-scoped audit events for sensitive API paths
+        app.Use(async (httpContext, next) =>
+        {
+            await next();
+            try
+            {
+                var path = httpContext.Request.Path.Value ?? string.Empty;
+                if (!path.StartsWith("/api/v1/", StringComparison.OrdinalIgnoreCase)) return;
+                var accessor = httpContext.RequestServices.GetService<ITenantContextAccessor>();
+                var current = accessor?.Current;
+                if (current is null) return;
+                var auditRepo = httpContext.RequestServices.GetService<IAuditRepository>();
+                if (auditRepo is null) return;
+
+                var action = $"{httpContext.Request.Method} {path}";
+                var segments = path.Split('/', StringSplitOptions.RemoveEmptyEntries);
+                var resourceType = segments.Length >= 3 ? segments[2] : "api";
+                string? resourceId = null;
+                if (httpContext.Request.RouteValues.TryGetValue("id", out var id)) resourceId = id?.ToString();
+                var source = httpContext.Connection.RemoteIpAddress?.ToString();
+                var userAgent = httpContext.Request.Headers["User-Agent"].FirstOrDefault();
+
+                var evt = new OnePage.Platform.AuditEvent(Guid.NewGuid().ToString("N"), current.TenantId, current.UserId, action, resourceType, resourceId, null, null, current.CorrelationId, source, userAgent);
+                await auditRepo.AddAsync(evt);
+            }
+            catch
+            {
+                // Best-effort audit; never fail the request because of audit problems
+            }
+        });
+
         app.MapGet("/health", () => Results.Ok(new { status = "ok" }));
         app.MapGet("/api/v1/platform/entitlements/{namespace}/{*name}", CheckEntitlement);
         app.MapGet("/api/v1/platform/organization/branches/{id}", async (string id, IOrganizationRepository repository, CancellationToken ct) => Results.Ok(await repository.GetAsync<Branch>(id, ct)));

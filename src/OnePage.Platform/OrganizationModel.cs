@@ -72,6 +72,7 @@ public sealed class OrganizationDbContext(DbContextOptions<OrganizationDbContext
     public DbSet<Role> Roles => Set<Role>();
     public DbSet<RolePermission> RolePermissions => Set<RolePermission>();
     public DbSet<MembershipRoleAssignment> MembershipRoleAssignments => Set<MembershipRoleAssignment>();
+    public DbSet<AuditEvent> AuditEvents => Set<AuditEvent>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -83,12 +84,47 @@ public sealed class OrganizationDbContext(DbContextOptions<OrganizationDbContext
         modelBuilder.Entity<Role>(e => { e.HasKey(x => x.Id); e.HasIndex(x => new { x.TenantId, x.Name }).IsUnique(); e.Property(x => x.Id).HasMaxLength(128); e.Property(x => x.TenantId).HasMaxLength(128).IsRequired(); e.Property(x => x.Name).HasMaxLength(256).IsRequired(); });
         modelBuilder.Entity<RolePermission>(e => { e.HasKey(x => x.Id); e.HasIndex(x => new { x.TenantId, x.RoleId, x.Permission }).IsUnique(); e.Property(x => x.Id).HasMaxLength(128); e.Property(x => x.TenantId).HasMaxLength(128).IsRequired(); e.Property(x => x.RoleId).HasMaxLength(128).IsRequired(); e.Property(x => x.Permission).HasMaxLength(256).IsRequired(); });
         modelBuilder.Entity<MembershipRoleAssignment>(e => { e.HasKey(x => x.Id); e.HasIndex(x => new { x.TenantId, x.MembershipId, x.RoleId }); e.Property(x => x.Id).HasMaxLength(128); e.Property(x => x.TenantId).HasMaxLength(128).IsRequired(); e.Property(x => x.MembershipId).HasMaxLength(128).IsRequired(); e.Property(x => x.RoleId).HasMaxLength(128).IsRequired(); e.Property(x => x.AmountLimit).HasPrecision(18, 2); e.Property(x => x.Currency).HasMaxLength(16); });
+        modelBuilder.Entity<AuditEvent>(e => { e.HasKey(x => x.Id); e.HasIndex(x => new { x.TenantId, x.CorrelationId }); e.Property(x => x.Id).HasMaxLength(128); e.Property(x => x.TenantId).HasMaxLength(128).IsRequired(); e.Property(x => x.ActorUserId).HasMaxLength(128).IsRequired(); e.Property(x => x.Action).HasMaxLength(128).IsRequired(); e.Property(x => x.ResourceType).HasMaxLength(128).IsRequired(); e.Property(x => x.ResourceId).HasMaxLength(128); e.Property(x => x.CorrelationId).HasMaxLength(128).IsRequired(); e.Property(x => x.CreatedAt).IsRequired(); });
     }
 
     private static void ConfigureOwned<T>(ModelBuilder modelBuilder) where T : TenantOwnedRecord
     {
         modelBuilder.Entity<T>(e => { e.HasKey(x => x.Id); e.HasIndex(x => new { x.TenantId, x.Name }); e.Property(x => x.Id).HasMaxLength(128); e.Property(x => x.TenantId).HasMaxLength(128).IsRequired(); e.Property(x => x.Name).HasMaxLength(256).IsRequired(); });
     }
+}
+
+public sealed class AuditEvent
+{
+    private AuditEvent() { }
+
+    public AuditEvent(string id, string tenantId, string actorUserId, string action, string resourceType, string? resourceId, string? beforeJson, string? afterJson, string correlationId, string? source, string? userAgent)
+    {
+        Id = Tenant.Required(id, nameof(id), "AuditEvent ID is required.");
+        TenantId = Tenant.Required(tenantId, nameof(tenantId), "Tenant ID is required.");
+        ActorUserId = Tenant.Required(actorUserId, nameof(actorUserId), "Actor user ID is required.");
+        Action = Tenant.Required(action, nameof(action), "Action is required.");
+        ResourceType = Tenant.Required(resourceType, nameof(resourceType), "Resource type is required.");
+        ResourceId = resourceId;
+        BeforeJson = beforeJson;
+        AfterJson = afterJson;
+        CorrelationId = Tenant.Required(correlationId, nameof(correlationId), "Correlation ID is required.");
+        Source = source;
+        UserAgent = userAgent;
+        CreatedAt = DateTimeOffset.UtcNow;
+    }
+
+    public string Id { get; private set; } = null!;
+    public string TenantId { get; private set; } = null!;
+    public string ActorUserId { get; private set; } = null!;
+    public string Action { get; private set; } = null!;
+    public string ResourceType { get; private set; } = null!;
+    public string? ResourceId { get; private set; }
+    public string? BeforeJson { get; private set; }
+    public string? AfterJson { get; private set; }
+    public string CorrelationId { get; private set; } = null!;
+    public string? Source { get; private set; }
+    public string? UserAgent { get; private set; }
+    public DateTimeOffset CreatedAt { get; private set; }
 }
 
 public sealed class OrganizationValidationException : ArgumentException
