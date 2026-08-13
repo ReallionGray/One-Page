@@ -17,7 +17,9 @@ public sealed class AuditRepository(OrganizationDbContext db) : IAuditRepository
     public async Task AddAsync(AuditEvent evt, CancellationToken cancellationToken = default)
     {
         // Compute prev hash for tenant
-        var prev = await _db.AuditEvents.AsNoTracking().Where(x => x.TenantId == evt.TenantId).OrderByDescending(x => x.CreatedAt).FirstOrDefaultAsync(cancellationToken);
+        // SQLite cannot translate DateTimeOffset in ORDER BY; load recent tenant events and order in memory as a safe fallback for demo/dev
+        var tenantEvents = await _db.AuditEvents.AsNoTracking().Where(x => x.TenantId == evt.TenantId).ToListAsync(cancellationToken);
+        var prev = tenantEvents.OrderByDescending(x => x.CreatedAt).FirstOrDefault();
         evt.GetType().GetProperty("PrevHash")!.SetValue(evt, prev?.Hash);
         // compute hash of concatenated fields
         var sb = new StringBuilder();
@@ -42,6 +44,9 @@ public sealed class AuditRepository(OrganizationDbContext db) : IAuditRepository
         await _db.SaveChangesAsync(cancellationToken);
     }
 
-    public Task<IReadOnlyList<AuditEvent>> ExportTenantEventsAsync(string tenantId, CancellationToken cancellationToken = default) =>
-        _db.AuditEvents.AsNoTracking().Where(x => x.TenantId == tenantId).OrderBy(x => x.CreatedAt).ToListAsync(cancellationToken).ContinueWith(t => (IReadOnlyList<AuditEvent>)t.Result, cancellationToken);
+    public async Task<IReadOnlyList<AuditEvent>> ExportTenantEventsAsync(string tenantId, CancellationToken cancellationToken = default)
+    {
+        var list = await _db.AuditEvents.AsNoTracking().Where(x => x.TenantId == tenantId).ToListAsync(cancellationToken);
+        return list.OrderBy(x => x.CreatedAt).ToList();
+    }
 }

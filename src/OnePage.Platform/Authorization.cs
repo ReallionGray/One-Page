@@ -20,7 +20,6 @@ public static class PermissionCatalog
 {
     public static readonly PermissionKey EmployeeView = new("employee.view");
     public static readonly PermissionKey PayrollRun = new("payroll.run");
-    public static readonly PermissionKey PurchaseOrderApprove = new("purchase_order.approve");
     public static readonly PermissionKey ReportExport = new("report.export");
 
     // Asset permissions
@@ -30,6 +29,23 @@ public static class PermissionCatalog
     public static readonly PermissionKey AssetTransfer = new("asset.transfer");
     public static readonly PermissionKey AssetDispose = new("asset.dispose");
     public static readonly PermissionKey ApprovalReview = new("approval.review");
+
+    // Procurement
+    public static readonly PermissionKey PurchaseOrderCreate = new("purchase_order.create");
+    public static readonly PermissionKey PurchaseOrderApprove = new("purchase_order.approve");
+
+    // Inventory
+    public static readonly PermissionKey InventoryAdjust = new("inventory.adjust");
+    public static readonly PermissionKey InventoryView = new("inventory.view");
+
+    // POS
+    public static readonly PermissionKey PosSaleCreate = new("pos.sale.create");
+
+    // Finance
+    public static readonly PermissionKey FinanceJournalExport = new("finance.journal.export");
+
+    // Reporting
+    public static readonly PermissionKey ReportRun = new("report.run");
 
     public static PermissionKey Create(string action) => new(action);
 }

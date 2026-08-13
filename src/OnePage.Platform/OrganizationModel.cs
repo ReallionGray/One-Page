@@ -75,6 +75,10 @@ public sealed class OrganizationDbContext(DbContextOptions<OrganizationDbContext
     public DbSet<AuditEvent> AuditEvents => Set<AuditEvent>();
     public DbSet<Asset> Assets => Set<Asset>();
     public DbSet<ApprovalRequest> ApprovalRequests => Set<ApprovalRequest>();
+    public DbSet<PurchaseOrder> PurchaseOrders => Set<PurchaseOrder>();
+    public DbSet<InventoryItem> InventoryItems => Set<InventoryItem>();
+    public DbSet<PosSale> PosSales => Set<PosSale>();
+    public DbSet<JournalEntry> JournalEntries => Set<JournalEntry>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -89,6 +93,10 @@ public sealed class OrganizationDbContext(DbContextOptions<OrganizationDbContext
         modelBuilder.Entity<AuditEvent>(e => { e.HasKey(x => x.Id); e.HasIndex(x => new { x.TenantId, x.CorrelationId }); e.Property(x => x.Id).HasMaxLength(128); e.Property(x => x.TenantId).HasMaxLength(128).IsRequired(); e.Property(x => x.ActorUserId).HasMaxLength(128).IsRequired(); e.Property(x => x.Action).HasMaxLength(128).IsRequired(); e.Property(x => x.ResourceType).HasMaxLength(128).IsRequired(); e.Property(x => x.ResourceId).HasMaxLength(128); e.Property(x => x.CorrelationId).HasMaxLength(128).IsRequired(); e.Property(x => x.CreatedAt).IsRequired(); e.Property(x => x.PrevHash).HasMaxLength(128); e.Property(x => x.Hash).HasMaxLength(128); });
         modelBuilder.Entity<Asset>(e => { e.HasKey(x => x.Id); e.HasIndex(x => new { x.TenantId, x.Tag }).IsUnique(); e.Property(x => x.Id).HasMaxLength(128); e.Property(x => x.TenantId).HasMaxLength(128).IsRequired(); e.Property(x => x.Tag).HasMaxLength(128).IsRequired(); e.Property(x => x.Name).HasMaxLength(256).IsRequired(); e.Property(x => x.CustodianEmployeeId).HasMaxLength(128); e.Property(x => x.LocationId).HasMaxLength(128); e.Property(x => x.Status).HasMaxLength(64).IsRequired(); e.Property(x => x.CreatedAt).IsRequired(); e.Property(x => x.UpdatedAt).IsRequired(false); });
         modelBuilder.Entity<ApprovalRequest>(e => { e.HasKey(x => x.Id); e.HasIndex(x => new { x.TenantId, x.Status }); e.Property(x => x.Id).HasMaxLength(128); e.Property(x => x.TenantId).HasMaxLength(128).IsRequired(); e.Property(x => x.RequestedBy).HasMaxLength(128).IsRequired(); e.Property(x => x.ResourceType).HasMaxLength(128).IsRequired(); e.Property(x => x.ResourceId).HasMaxLength(128); e.Property(x => x.Status).HasMaxLength(32).IsRequired(); e.Property(x => x.CreatedAt).IsRequired(); });
+        modelBuilder.Entity<PurchaseOrder>(e => { e.HasKey(x => x.Id); e.HasIndex(x => new { x.TenantId, x.Supplier }); e.Property(x => x.Id).HasMaxLength(128); e.Property(x => x.TenantId).HasMaxLength(128).IsRequired(); e.Property(x => x.Supplier).HasMaxLength(256); e.Property(x => x.Status).HasMaxLength(32).IsRequired(); e.Property(x => x.CreatedAt).IsRequired(); });
+        modelBuilder.Entity<InventoryItem>(e => { e.HasKey(x => x.Id); e.HasIndex(x => new { x.TenantId, x.Sku }).IsUnique(); e.Property(x => x.Id).HasMaxLength(128); e.Property(x => x.TenantId).HasMaxLength(128).IsRequired(); e.Property(x => x.Sku).HasMaxLength(128).IsRequired(); e.Property(x => x.Name).HasMaxLength(256).IsRequired(); e.Property(x => x.Quantity).HasPrecision(18, 2); e.Property(x => x.CreatedAt).IsRequired(); });
+        modelBuilder.Entity<PosSale>(e => { e.HasKey(x => x.Id); e.HasIndex(x => new { x.TenantId, x.RegisterId }); e.Property(x => x.Id).HasMaxLength(128); e.Property(x => x.TenantId).HasMaxLength(128).IsRequired(); e.Property(x => x.RegisterId).HasMaxLength(128); e.Property(x => x.Total).HasPrecision(18, 2); e.Property(x => x.CreatedAt).IsRequired(); });
+        modelBuilder.Entity<JournalEntry>(e => { e.HasKey(x => x.Id); e.HasIndex(x => new { x.TenantId, x.CreatedAt }); e.Property(x => x.Id).HasMaxLength(128); e.Property(x => x.TenantId).HasMaxLength(128).IsRequired(); e.Property(x => x.Reference).HasMaxLength(256); e.Property(x => x.CreatedAt).IsRequired(); });
     }
 
     private static void ConfigureOwned<T>(ModelBuilder modelBuilder) where T : TenantOwnedRecord
@@ -193,6 +201,99 @@ public sealed class ApprovalRequest
         Status = "rejected";
         DecidedAt = DateTimeOffset.UtcNow;
     }
+}
+
+public sealed class PurchaseOrder
+{
+    private PurchaseOrder() { }
+
+    public PurchaseOrder(string id, string tenantId, string supplier, decimal totalAmount)
+    {
+        Id = Tenant.Required(id, nameof(id), "PO ID is required.");
+        TenantId = Tenant.Required(tenantId, nameof(tenantId), "Tenant ID is required.");
+        Supplier = Tenant.Required(supplier, nameof(supplier), "Supplier is required.");
+        TotalAmount = totalAmount;
+        Status = "draft";
+        CreatedAt = DateTimeOffset.UtcNow;
+    }
+
+    public string Id { get; private set; } = null!;
+    public string TenantId { get; private set; } = null!;
+    public string Supplier { get; private set; } = null!;
+    public decimal TotalAmount { get; private set; }
+    public string Status { get; private set; } = null!; // draft | approved | closed
+    public DateTimeOffset CreatedAt { get; private set; }
+
+    public void Approve(string approverUserId)
+    {
+        _ = Tenant.Required(approverUserId, nameof(approverUserId), "Approver user ID is required.");
+        Status = "approved";
+    }
+}
+
+public sealed class InventoryItem
+{
+    private InventoryItem() { }
+
+    public InventoryItem(string id, string tenantId, string sku, string name, decimal quantity)
+    {
+        Id = Tenant.Required(id, nameof(id), "Inventory item ID is required.");
+        TenantId = Tenant.Required(tenantId, nameof(tenantId), "Tenant ID is required.");
+        Sku = Tenant.Required(sku, nameof(sku), "SKU is required.");
+        Name = Tenant.Required(name, nameof(name), "Name is required.");
+        Quantity = quantity;
+        CreatedAt = DateTimeOffset.UtcNow;
+    }
+
+    public string Id { get; private set; } = null!;
+    public string TenantId { get; private set; } = null!;
+    public string Sku { get; private set; } = null!;
+    public string Name { get; private set; } = null!;
+    public decimal Quantity { get; private set; }
+    public DateTimeOffset CreatedAt { get; private set; }
+
+    public void Adjust(decimal delta)
+    {
+        Quantity += delta;
+    }
+}
+
+public sealed class PosSale
+{
+    private PosSale() { }
+
+    public PosSale(string id, string tenantId, string registerId, decimal total)
+    {
+        Id = Tenant.Required(id, nameof(id), "Sale ID is required.");
+        TenantId = Tenant.Required(tenantId, nameof(tenantId), "Tenant ID is required.");
+        RegisterId = registerId;
+        Total = total;
+        CreatedAt = DateTimeOffset.UtcNow;
+    }
+
+    public string Id { get; private set; } = null!;
+    public string TenantId { get; private set; } = null!;
+    public string? RegisterId { get; private set; }
+    public decimal Total { get; private set; }
+    public DateTimeOffset CreatedAt { get; private set; }
+}
+
+public sealed class JournalEntry
+{
+    private JournalEntry() { }
+
+    public JournalEntry(string id, string tenantId, string reference)
+    {
+        Id = Tenant.Required(id, nameof(id), "Journal entry ID is required.");
+        TenantId = Tenant.Required(tenantId, nameof(tenantId), "Tenant ID is required.");
+        Reference = reference;
+        CreatedAt = DateTimeOffset.UtcNow;
+    }
+
+    public string Id { get; private set; } = null!;
+    public string TenantId { get; private set; } = null!;
+    public string? Reference { get; private set; }
+    public DateTimeOffset CreatedAt { get; private set; }
 }
 
 public sealed class AuditEvent

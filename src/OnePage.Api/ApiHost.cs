@@ -1,5 +1,6 @@
 using OnePage.Platform;
 using Microsoft.EntityFrameworkCore;
+using OnePage.Api.Endpoints;
 
 namespace OnePage.Api;
 
@@ -25,42 +26,83 @@ public static class ApiHost
         builder.Services.AddScoped<IAuditRepository, AuditRepository>();
         builder.Services.AddScoped<IAssetsRepository, AssetsRepository>();
         builder.Services.AddScoped<IApprovalRepository, ApprovalRepository>();
+        builder.Services.AddScoped<IProcurementRepository, ProcurementRepository>();
+        builder.Services.AddScoped<IInventoryRepository, InventoryRepository>();
+        builder.Services.AddScoped<IPosRepository, PosRepository>();
+        builder.Services.AddScoped<IFinanceRepository, FinanceRepository>();
+
+        // Swagger/OpenAPI
+        builder.Services.AddEndpointsApiExplorer();
+        builder.Services.AddSwaggerGen();
+
         var app = builder.Build();
+
+        // Swagger/OpenAPI
+        app.UseSwagger();
+        app.UseSwaggerUI();
         app.Use(async (httpContext, next) =>
         {
-            if (!httpContext.Request.Path.StartsWithSegments("/api/v1/platform"))
+            var path = httpContext.Request.Path.Value ?? string.Empty;
+            if (!path.StartsWith("/api/v1", StringComparison.OrdinalIgnoreCase))
             {
                 await next(httpContext);
                 return;
             }
 
             var credentials = httpContext.RequestServices.GetRequiredService<ITrustedApiCredentialResolver>();
-            var credential = credentials.Resolve(httpContext.Request.Headers["X-API-Key"].FirstOrDefault());
-            if (credential is null)
-            {
-                httpContext.Response.StatusCode = StatusCodes.Status401Unauthorized;
-                await Results.Problem(statusCode: 401, title: "Authentication required", detail: "A valid API key is required.").ExecuteAsync(httpContext);
-                return;
-            }
-
-            var tenantId = httpContext.Request.Headers["X-Tenant-Id"].FirstOrDefault();
-            if (string.IsNullOrWhiteSpace(tenantId))
-            {
-                httpContext.Response.StatusCode = StatusCodes.Status400BadRequest;
-                await Results.Problem(statusCode: 400, title: "Tenant selection required", detail: "X-Tenant-Id is required.").ExecuteAsync(httpContext);
-                return;
-            }
-
-            if (!credential.AllowedTenantIds.Contains(tenantId.Trim()))
-            {
-                httpContext.Response.StatusCode = StatusCodes.Status403Forbidden;
-                await Results.Problem(statusCode: 403, title: "Tenant access denied", detail: "The API credential is not authorized for this tenant.").ExecuteAsync(httpContext);
-                return;
-            }
-
             var accessor = httpContext.RequestServices.GetRequiredService<TenantContextAccessor>();
-            accessor.Current = TenantContext.Create(credential.UserId, tenantId, httpContext.Request.Headers["X-Correlation-Id"].FirstOrDefault() ?? Guid.NewGuid().ToString("N"));
-            await next(httpContext);
+            var apiKey = httpContext.Request.Headers["X-API-Key"].FirstOrDefault();
+            var tenantHeader = httpContext.Request.Headers["X-Tenant-Id"].FirstOrDefault();
+            var correlation = httpContext.Request.Headers["X-Correlation-Id"].FirstOrDefault() ?? Guid.NewGuid().ToString("N");
+
+            // If an API key is provided, attempt to resolve it. If resolution fails in development, fall back to demo tenant.
+            if (!string.IsNullOrWhiteSpace(apiKey))
+            {
+                var credential = credentials.Resolve(apiKey);
+                if (credential is null)
+                {
+                    if (app.Environment.IsDevelopment())
+                    {
+                        accessor.Current = TenantContext.Create("demo-user", "demo-tenant", correlation);
+                        await next(httpContext);
+                        return;
+                    }
+                    httpContext.Response.StatusCode = StatusCodes.Status401Unauthorized;
+                    await Results.Problem(statusCode: 401, title: "Authentication required", detail: "A valid API key is required.").ExecuteAsync(httpContext);
+                    return;
+                }
+
+                if (string.IsNullOrWhiteSpace(tenantHeader))
+                {
+                    httpContext.Response.StatusCode = StatusCodes.Status400BadRequest;
+                    await Results.Problem(statusCode: 400, title: "Tenant selection required", detail: "X-Tenant-Id is required.").ExecuteAsync(httpContext);
+                    return;
+                }
+
+                if (!credential.AllowedTenantIds.Contains(tenantHeader.Trim()))
+                {
+                    httpContext.Response.StatusCode = StatusCodes.Status403Forbidden;
+                    await Results.Problem(statusCode: 403, title: "Tenant access denied", detail: "The API credential is not authorized for this tenant.").ExecuteAsync(httpContext);
+                    return;
+                }
+
+                accessor.Current = TenantContext.Create(credential.UserId, tenantHeader, correlation);
+                await next(httpContext);
+                return;
+            }
+
+            // No API key supplied: in Development environment, auto-inject demo tenant context to help the SPA work without headers.
+            if (app.Environment.IsDevelopment())
+            {
+                accessor.Current = TenantContext.Create("demo-user", "demo-tenant", correlation);
+                await next(httpContext);
+                return;
+            }
+
+            // Otherwise require an API key
+            httpContext.Response.StatusCode = StatusCodes.Status401Unauthorized;
+            await Results.Problem(statusCode: 401, title: "Authentication required", detail: "A valid API key is required.").ExecuteAsync(httpContext);
+            return;
         });
 
         // Audit middleware: records tenant-scoped audit events for sensitive API paths
@@ -100,139 +142,86 @@ public static class ApiHost
         app.MapGet("/api/v1/platform/context", (ITenantContextAccessor accessor) => Results.Ok(accessor.Current));
         app.MapGet("/api/v1/platform/authorize/{*permission}", Authorize);
 
+        // Add simple listing endpoints for the SPA/demo
+        app.MapGet("/api/v1/assets", async (ITenantContextAccessor ctx, IAssetsRepository repo, CancellationToken ct) =>
+        {
+            var current = ctx.Current ?? throw new TenantContextValidationException("tenantContext", "A tenant context is required.");
+            var list = await repo.ListAsync(current.TenantId, ct);
+            return Results.Ok(list);
+        });
+
+        app.MapGet("/api/v1/approvals", async (ITenantContextAccessor ctx, IApprovalRepository approvals, CancellationToken ct) =>
+        {
+            var current = ctx.Current ?? throw new TenantContextValidationException("tenantContext", "A tenant context is required.");
+            var list = await approvals.ListPendingAsync(current.TenantId, ct);
+            return Results.Ok(list);
+        });
+
         MapAssetEndpoints(app);
         MapApprovalEndpoints(app);
+        MapProcurementEndpoints(app);
+        MapInventoryEndpoints(app);
+        MapPosEndpoints(app);
+        MapFinanceEndpoints(app);
+        MapReportingEndpoints(app);
         return app;
     }
 
     private static void MapAssetEndpoints(WebApplication app)
     {
-        app.MapPost("/api/v1/assets", async (CreateAssetCommand c, ITenantContextAccessor ctx, IAuthorizationEvaluator auth, IEntitlementEvaluator ent, IAssetsRepository repo, IAuditRepository audit, CancellationToken ct) =>
-        {
-            var current = ctx.Current ?? throw new TenantContextValidationException("tenantContext", "A tenant context is required.");
-            if (!ent.Evaluate(current, EntitlementKeys.Modules.Assets).Allowed) return Results.Problem(statusCode: 403, title: "Assets module unavailable", detail: "The Assets module is not enabled for this subscription.");
-            var decision = await auth.AuthorizeAsync(new AuthorizationRequest(current, PermissionCatalog.AssetCreate, new AuthorizationScope(c.LegalEntityId, c.BranchId, c.DepartmentId, c.LocationId)));
-            if (!decision.Allowed) return Results.Problem(statusCode: 403, title: "Authorization denied", detail: "Not authorized to create assets.", extensions: new Dictionary<string, object?> { ["denialReason"] = decision.DenialReason?.ToString() });
-            var asset = await repo.CreateAsync(new Asset(c.Id, current.TenantId, c.Tag, c.Name, c.Description, c.LocationId, c.CustodianEmployeeId), ct);
-            await audit.AddAsync(new OnePage.Platform.AuditEvent(Guid.NewGuid().ToString("N"), current.TenantId, current.UserId, $"asset.create:{asset.Id}", "asset", asset.Id, null, null, current.CorrelationId, null, null), ct);
-            return Results.Created($"/api/v1/assets/{asset.Id}", asset);
-        });
-
-        app.MapGet("/api/v1/assets/{id}", async (string id, ITenantContextAccessor ctx, IAuthorizationEvaluator auth, IEntitlementEvaluator ent, IAssetsRepository repo, CancellationToken ct) =>
-        {
-            var current = ctx.Current ?? throw new TenantContextValidationException("tenantContext", "A tenant context is required.");
-            var asset = await repo.GetAsync(id, ct);
-            if (asset is null) return Results.NotFound();
-            var decision = await auth.AuthorizeAsync(new AuthorizationRequest(current, PermissionCatalog.AssetView, new AuthorizationScope(null, null, null, asset.LocationId)));
-            if (!decision.Allowed) return Results.Problem(statusCode: 403, title: "Authorization denied", detail: "Not authorized to view asset.", extensions: new Dictionary<string, object?> { ["denialReason"] = decision.DenialReason?.ToString() });
-            return Results.Ok(asset);
-        });
-
-        app.MapPost("/api/v1/assets/{id}/assign", async (string id, AssignAssetCommand c, ITenantContextAccessor ctx, IAuthorizationEvaluator auth, IEntitlementEvaluator ent, IAssetsRepository repo, IAuditRepository audit, CancellationToken ct) =>
-        {
-            var current = ctx.Current ?? throw new TenantContextValidationException("tenantContext", "A tenant context is required.");
-            if (!ent.Evaluate(current, EntitlementKeys.Modules.Assets).Allowed) return Results.Problem(statusCode: 403, title: "Assets module unavailable", detail: "The Assets module is not enabled for this subscription.");
-            var asset = await repo.GetAsync(id, ct);
-            if (asset is null) return Results.NotFound();
-            var decision = await auth.AuthorizeAsync(new AuthorizationRequest(current, PermissionCatalog.AssetAssign, new AuthorizationScope(null, null, null, asset.LocationId)));
-            if (!decision.Allowed) return Results.Problem(statusCode: 403, title: "Authorization denied", detail: "Not authorized to assign asset.", extensions: new Dictionary<string, object?> { ["denialReason"] = decision.DenialReason?.ToString() });
-            asset.AssignToEmployee(c.EmployeeId);
-            await repo.UpdateAsync(asset, ct);
-            await audit.AddAsync(new OnePage.Platform.AuditEvent(Guid.NewGuid().ToString("N"), current.TenantId, current.UserId, $"asset.assign:{asset.Id}", "asset", asset.Id, null, null, current.CorrelationId, null, null), ct);
-            return Results.Ok(asset);
-        });
-
-        app.MapPost("/api/v1/assets/{id}/dispose", async (string id, DisposeAssetCommand c, ITenantContextAccessor ctx, IAuthorizationEvaluator auth, IEntitlementEvaluator ent, IAssetsRepository repo, IAuditRepository audit, IApprovalRepository approvals, CancellationToken ct) =>
-        {
-            var current = ctx.Current ?? throw new TenantContextValidationException("tenantContext", "A tenant context is required.");
-            if (!ent.Evaluate(current, EntitlementKeys.Modules.Assets).Allowed) return Results.Problem(statusCode: 403, title: "Assets module unavailable", detail: "The Assets module is not enabled for this subscription.");
-            var asset = await repo.GetAsync(id, ct);
-            if (asset is null) return Results.NotFound();
-            var decision = await auth.AuthorizeAsync(new AuthorizationRequest(current, PermissionCatalog.AssetDispose, new AuthorizationScope(null, null, null, asset.LocationId)));
-            if (!decision.Allowed)
-            {
-                // Create approval request for disposal
-                var req = await approvals.CreateAsync(new OnePage.Platform.ApprovalRequest(Guid.NewGuid().ToString("N"), current.TenantId, "asset.dispose", asset.Id, current.UserId, c.Reason), ct);
-                await audit.AddAsync(new OnePage.Platform.AuditEvent(Guid.NewGuid().ToString("N"), current.TenantId, current.UserId, $"asset.dispose.request:{asset.Id}", "approval", req.Id, null, null, current.CorrelationId, null, null), ct);
-                return Results.Accepted($"/api/v1/approvals/{req.Id}", new { approvalId = req.Id });
-            }
-            asset.Dispose(current.UserId);
-            await repo.UpdateAsync(asset, ct);
-            await audit.AddAsync(new OnePage.Platform.AuditEvent(Guid.NewGuid().ToString("N"), current.TenantId, current.UserId, $"asset.dispose:{asset.Id}", "asset", asset.Id, null, null, current.CorrelationId, null, null), ct);
-            return Results.Ok(asset);
-        });
+        app.MapAssetsEndpoints();
     }
-
-    public record CreateAssetCommand(string Id, string Tag, string Name, string? Description, string? LocationId, string? CustodianEmployeeId, string? LegalEntityId, string? BranchId, string? DepartmentId);
-    public record AssignAssetCommand(string EmployeeId);
-    public record DisposeAssetCommand(string Reason);
-    public record DecideApprovalCommand(bool Approve, string? Comment);
 
     private static void MapApprovalEndpoints(WebApplication app)
     {
-        app.MapGet("/api/v1/approvals/{id}", async (string id, ITenantContextAccessor ctx, IApprovalRepository approvals, CancellationToken ct) =>
-        {
-            var current = ctx.Current ?? throw new TenantContextValidationException("tenantContext", "A tenant context is required.");
-            var req = await approvals.GetAsync(id, ct);
-            if (req is null) return Results.NotFound();
-            if (!string.Equals(req.TenantId, current.TenantId, StringComparison.Ordinal)) return Results.Problem(statusCode: 403, title: "Cross-tenant", detail: "Request does not belong to current tenant.");
-            return Results.Ok(req);
-        });
+        app.MapApprovalEndpoints();
+    }
 
-        app.MapPost("/api/v1/approvals/{id}/decide", async (string id, DecideApprovalCommand c, ITenantContextAccessor ctx, IApprovalRepository approvals, IAuthorizationEvaluator auth, IEntitlementEvaluator ent, IAuditRepository audit, IAssetsRepository assets, CancellationToken ct) =>
-        {
-            var current = ctx.Current ?? throw new TenantContextValidationException("tenantContext", "A tenant context is required.");
-            var req = await approvals.GetAsync(id, ct);
-            if (req is null) return Results.NotFound();
-            if (req.TenantId != current.TenantId) return Results.Problem(statusCode: 403, title: "Cross-tenant", detail: "Request does not belong to current tenant.");
-            var decisionAuth = await auth.AuthorizeAsync(new AuthorizationRequest(current, PermissionCatalog.ApprovalReview));
-            if (!decisionAuth.Allowed) return Results.Problem(statusCode: 403, title: "Authorization denied", detail: "Not authorized to decide approvals.");
-            try
-            {
-                if (c.Approve)
-                {
-                    req.Approve(current.UserId, c.Comment);
-                    await approvals.UpdateAsync(req, ct);
-                    await audit.AddAsync(new OnePage.Platform.AuditEvent(Guid.NewGuid().ToString("N"), current.TenantId, current.UserId, $"approval.approve:{req.Id}", "approval", req.Id, null, null, current.CorrelationId, null, null), ct);
-                    if (req.ResourceType == "asset.dispose" && !string.IsNullOrWhiteSpace(req.ResourceId))
-                    {
-                        var asset = await assets.GetAsync(req.ResourceId, ct);
-                        if (asset is not null)
-                        {
-                            asset.Dispose(current.UserId);
-                            await assets.UpdateAsync(asset, ct);
-                            await audit.AddAsync(new OnePage.Platform.AuditEvent(Guid.NewGuid().ToString("N"), current.TenantId, current.UserId, $"asset.dispose:approved:{asset.Id}", "asset", asset.Id, null, null, current.CorrelationId, null, null), ct);
-                        }
-                    }
-                    return Results.Ok(req);
-                }
-                else
-                {
-                    req.Reject(current.UserId, c.Comment);
-                    await approvals.UpdateAsync(req, ct);
-                    await audit.AddAsync(new OnePage.Platform.AuditEvent(Guid.NewGuid().ToString("N"), current.TenantId, current.UserId, $"approval.reject:{req.Id}", "approval", req.Id, null, null, current.CorrelationId, null, null), ct);
-                    return Results.Ok(req);
-                }
-            }
-            catch (ArgumentException ex) { return Results.Problem(statusCode: 400, title: "Invalid approval decision", detail: ex.Message); }
-        });
+    private static void MapProcurementEndpoints(WebApplication app)
+    {
+        app.MapProcurementEndpoints();
+    }
 
-        app.MapGet("/api/v1/platform/audit/export", async (ITenantContextAccessor ctx, IAuditRepository audit, IAuthorizationEvaluator auth, CancellationToken ct) =>
-        {
-            var current = ctx.Current ?? throw new TenantContextValidationException("tenantContext", "A tenant context is required.");
-            var decision = await auth.AuthorizeAsync(new AuthorizationRequest(current, PermissionCatalog.ReportExport));
-            if (!decision.Allowed) return Results.Problem(statusCode: 403, title: "Authorization denied", detail: "Not authorized to export audit logs.");
-            var events = await audit.ExportTenantEventsAsync(current.TenantId, ct);
-            return Results.Ok(events);
-        });
+    private static void MapInventoryEndpoints(WebApplication app)
+    {
+        app.MapInventoryEndpoints();
+    }
+
+    private static void MapPosEndpoints(WebApplication app)
+    {
+        app.MapPosEndpoints();
+    }
+
+    private static void MapFinanceEndpoints(WebApplication app)
+    {
+        app.MapFinanceEndpoints();
+    }
+
+    private static void MapReportingEndpoints(WebApplication app)
+    {
+        app.MapReportingEndpoints();
     }
 
 
+
+
+
+
+    
     public static async Task InitializeDatabaseAsync(IServiceProvider services, CancellationToken cancellationToken = default)
     {
         await using var scope = services.CreateAsyncScope();
         var db = scope.ServiceProvider.GetRequiredService<OrganizationDbContext>();
         await OrganizationPersistence.InitializeAsync(db, cancellationToken);
+        // Seed demo data for presentation
+        try
+        {
+            await DemoData.SeedAsync(services, cancellationToken);
+        }
+        catch
+        {
+            // best-effort
+        }
     }
 
     private static IResult CheckEntitlement(string @namespace, string name, ITenantContextAccessor accessor, IEntitlementEvaluator evaluator, HttpRequest request)

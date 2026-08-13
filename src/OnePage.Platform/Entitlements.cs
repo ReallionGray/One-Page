@@ -20,6 +20,9 @@ public static class EntitlementKeys
         public static readonly EntitlementKey Procurement = EntitlementKey.Module("procurement");
         public static readonly EntitlementKey Assets = EntitlementKey.Module("assets");
         public static readonly EntitlementKey Pos = EntitlementKey.Module("pos");
+        public static readonly EntitlementKey Inventory = EntitlementKey.Module("inventory");
+        public static readonly EntitlementKey Finance = EntitlementKey.Module("finance");
+        public static readonly EntitlementKey Reporting = EntitlementKey.Module("reporting");
     }
     public static class Features
     {
