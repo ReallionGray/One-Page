@@ -33,7 +33,7 @@ if ! lsof -iTCP -sTCP:LISTEN -P -n | grep -q ':5001'; then
 fi
 
 echo "Starting OnePage UI at $UI_URL..."
-(dotnet run --project src/OnePage.Ui --urls $UI_URL --no-build > ./logs/ui.log 2>&1) &
+(dotnet run --project src/OnePage.Web --urls $UI_URL --no-build > ./logs/ui.log 2>&1) &
 UI_PID=$!
 
 # wait for UI port
