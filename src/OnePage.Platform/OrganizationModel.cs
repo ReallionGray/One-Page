@@ -73,6 +73,7 @@ public sealed class OrganizationDbContext(DbContextOptions<OrganizationDbContext
     public DbSet<RolePermission> RolePermissions => Set<RolePermission>();
     public DbSet<MembershipRoleAssignment> MembershipRoleAssignments => Set<MembershipRoleAssignment>();
     public DbSet<AuditEvent> AuditEvents => Set<AuditEvent>();
+    public DbSet<Asset> Assets => Set<Asset>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -85,11 +86,63 @@ public sealed class OrganizationDbContext(DbContextOptions<OrganizationDbContext
         modelBuilder.Entity<RolePermission>(e => { e.HasKey(x => x.Id); e.HasIndex(x => new { x.TenantId, x.RoleId, x.Permission }).IsUnique(); e.Property(x => x.Id).HasMaxLength(128); e.Property(x => x.TenantId).HasMaxLength(128).IsRequired(); e.Property(x => x.RoleId).HasMaxLength(128).IsRequired(); e.Property(x => x.Permission).HasMaxLength(256).IsRequired(); });
         modelBuilder.Entity<MembershipRoleAssignment>(e => { e.HasKey(x => x.Id); e.HasIndex(x => new { x.TenantId, x.MembershipId, x.RoleId }); e.Property(x => x.Id).HasMaxLength(128); e.Property(x => x.TenantId).HasMaxLength(128).IsRequired(); e.Property(x => x.MembershipId).HasMaxLength(128).IsRequired(); e.Property(x => x.RoleId).HasMaxLength(128).IsRequired(); e.Property(x => x.AmountLimit).HasPrecision(18, 2); e.Property(x => x.Currency).HasMaxLength(16); });
         modelBuilder.Entity<AuditEvent>(e => { e.HasKey(x => x.Id); e.HasIndex(x => new { x.TenantId, x.CorrelationId }); e.Property(x => x.Id).HasMaxLength(128); e.Property(x => x.TenantId).HasMaxLength(128).IsRequired(); e.Property(x => x.ActorUserId).HasMaxLength(128).IsRequired(); e.Property(x => x.Action).HasMaxLength(128).IsRequired(); e.Property(x => x.ResourceType).HasMaxLength(128).IsRequired(); e.Property(x => x.ResourceId).HasMaxLength(128); e.Property(x => x.CorrelationId).HasMaxLength(128).IsRequired(); e.Property(x => x.CreatedAt).IsRequired(); });
+        modelBuilder.Entity<Asset>(e => { e.HasKey(x => x.Id); e.HasIndex(x => new { x.TenantId, x.Tag }).IsUnique(); e.Property(x => x.Id).HasMaxLength(128); e.Property(x => x.TenantId).HasMaxLength(128).IsRequired(); e.Property(x => x.Tag).HasMaxLength(128).IsRequired(); e.Property(x => x.Name).HasMaxLength(256).IsRequired(); e.Property(x => x.CustodianEmployeeId).HasMaxLength(128); e.Property(x => x.LocationId).HasMaxLength(128); e.Property(x => x.Status).HasMaxLength(64).IsRequired(); e.Property(x => x.CreatedAt).IsRequired(); e.Property(x => x.UpdatedAt).IsRequired(false); });
     }
 
     private static void ConfigureOwned<T>(ModelBuilder modelBuilder) where T : TenantOwnedRecord
     {
         modelBuilder.Entity<T>(e => { e.HasKey(x => x.Id); e.HasIndex(x => new { x.TenantId, x.Name }); e.Property(x => x.Id).HasMaxLength(128); e.Property(x => x.TenantId).HasMaxLength(128).IsRequired(); e.Property(x => x.Name).HasMaxLength(256).IsRequired(); });
+    }
+}
+
+public sealed class Asset
+{
+    private Asset() { }
+
+    public Asset(string id, string tenantId, string tag, string name, string? description = null, string? locationId = null, string? custodianEmployeeId = null)
+    {
+        Id = Tenant.Required(id, nameof(id), "Asset ID is required.");
+        TenantId = Tenant.Required(tenantId, nameof(tenantId), "Tenant ID is required.");
+        Tag = Tenant.Required(tag, nameof(tag), "Asset tag is required.");
+        Name = Tenant.Required(name, nameof(name), "Asset name is required.");
+        Description = description;
+        LocationId = locationId;
+        CustodianEmployeeId = custodianEmployeeId;
+        Status = "in_service";
+        CreatedAt = DateTimeOffset.UtcNow;
+    }
+
+    public string Id { get; private set; } = null!;
+    public string TenantId { get; private set; } = null!;
+    public string Tag { get; private set; } = null!;
+    public string Name { get; private set; } = null!;
+    public string? Description { get; private set; }
+    public string? LocationId { get; private set; }
+    public string? CustodianEmployeeId { get; private set; }
+    public string Status { get; private set; } = null!; // in_service | assigned | disposed
+    public DateTimeOffset CreatedAt { get; private set; }
+    public DateTimeOffset? UpdatedAt { get; private set; }
+
+    public void AssignToEmployee(string employeeId)
+    {
+        CustodianEmployeeId = Tenant.Required(employeeId, nameof(employeeId), "Employee ID is required.");
+        Status = "assigned";
+        UpdatedAt = DateTimeOffset.UtcNow;
+    }
+
+    public void Transfer(string? locationId, string? newCustodianEmployeeId)
+    {
+        LocationId = string.IsNullOrWhiteSpace(locationId) ? null : locationId.Trim();
+        CustodianEmployeeId = string.IsNullOrWhiteSpace(newCustodianEmployeeId) ? null : newCustodianEmployeeId.Trim();
+        Status = "in_service";
+        UpdatedAt = DateTimeOffset.UtcNow;
+    }
+
+    public void Dispose(string actorUserId)
+    {
+        _ = Tenant.Required(actorUserId, nameof(actorUserId), "Actor user ID is required.");
+        Status = "disposed";
+        UpdatedAt = DateTimeOffset.UtcNow;
     }
 }
 
