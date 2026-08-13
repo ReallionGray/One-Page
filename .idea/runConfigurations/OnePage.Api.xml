@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<component name="ProjectRunConfigurationManager">
+  <configuration default="false" name="OnePage.Api" type="DotNetRunConfigurationType" factoryName=".NET Launch">
+    <option name="PROJECT_FILE_PATH" value="$PROJECT_DIR$/src/OnePage.Api/OnePage.Api.csproj" />
+    <option name="PROGRAM_PARAMETERS" value="--urls http://localhost:5001" />
+    <option name="WORKING_DIRECTORY" value="$PROJECT_DIR$" />
+    <option name="DOTNET_RUN_MESSAGES" value="true" />
+    <envs />
+    <method v="2" />
+  </configuration>
+</component>
