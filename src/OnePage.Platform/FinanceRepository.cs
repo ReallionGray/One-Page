@@ -17,6 +17,9 @@ public sealed class FinanceRepository(OrganizationDbContext db) : IFinanceReposi
         await _db.SaveChangesAsync(cancellationToken);
         return entry;
     }
-    public Task<IReadOnlyList<JournalEntry>> ListAsync(string tenantId, CancellationToken cancellationToken = default) =>
-        _db.JournalEntries.AsNoTracking().Where(x => x.TenantId == tenantId).OrderByDescending(x => x.CreatedAt).ToListAsync(cancellationToken).ContinueWith(t => (IReadOnlyList<JournalEntry>)t.Result, cancellationToken);
+    public async Task<IReadOnlyList<JournalEntry>> ListAsync(string tenantId, CancellationToken cancellationToken = default)
+    {
+        var list = await _db.JournalEntries.AsNoTracking().Where(x => x.TenantId == tenantId).ToListAsync(cancellationToken);
+        return list.OrderByDescending(x => x.CreatedAt).ToList();
+    }
 }

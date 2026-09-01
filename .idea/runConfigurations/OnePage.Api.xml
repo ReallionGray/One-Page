@@ -5,7 +5,10 @@
     <option name="PROGRAM_PARAMETERS" value="--urls http://localhost:5001" />
     <option name="WORKING_DIRECTORY" value="$PROJECT_DIR$" />
     <option name="DOTNET_RUN_MESSAGES" value="true" />
-    <envs />
+    <envs>
+      <env name="ASPNETCORE_ENVIRONMENT" value="Development" />
+      <env name="OnePage__DatabaseProvider" value="sqlite" />
+    </envs>
     <method v="2" />
   </configuration>
 </component>

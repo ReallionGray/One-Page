@@ -1,4 +1,5 @@
 using Microsoft.EntityFrameworkCore;
+using System.Security.Claims;
 
 namespace OnePage.Platform;
 
@@ -19,7 +20,17 @@ public readonly record struct PermissionKey
 public static class PermissionCatalog
 {
     public static readonly PermissionKey EmployeeView = new("employee.view");
+    public static readonly PermissionKey EmployeeCreate = new("employee.create");
+    public static readonly PermissionKey EmployeeUpdate = new("employee.update");
+    public static readonly PermissionKey EmployeeTerminate = new("employee.terminate");
+    public static readonly PermissionKey LeaveRequest = new("leave.request");
+    public static readonly PermissionKey LeaveApprove = new("leave.approve");
+    public static readonly PermissionKey DisciplinaryManage = new("disciplinary.manage");
+    public static readonly PermissionKey RecruitmentManage = new("recruitment.manage");
+    public static readonly PermissionKey PerformanceManage = new("performance.manage");
+    public static readonly PermissionKey AttendanceManage = new("attendance.manage");
     public static readonly PermissionKey PayrollRun = new("payroll.run");
+    public static readonly PermissionKey PayrollProcess = new("payroll.process");
     public static readonly PermissionKey ReportExport = new("report.export");
 
     // Asset permissions
@@ -47,7 +58,78 @@ public static class PermissionCatalog
     // Reporting
     public static readonly PermissionKey ReportRun = new("report.run");
 
+    // Management permissions — these are implicitly granted to SuperAdmin and
+    // Organization Admin roles within their scope.
+    public static readonly PermissionKey UserManage = new("user.manage");
+    public static readonly PermissionKey RoleManage = new("role.manage");
+    public static readonly PermissionKey PermissionManage = new("permission.manage");
+    public static readonly PermissionKey OrganizationManage = new("organization.manage");
+    public static readonly PermissionKey WorkflowManage = new("workflow.manage");
+
     public static PermissionKey Create(string action) => new(action);
+}
+
+/// <summary>
+/// Well-known role names used throughout the system.
+/// </summary>
+public static class RoleNames
+{
+    /// <summary>
+    /// The super admin role grants unrestricted access across all tenants and modules.
+    /// </summary>
+    public const string SuperAdmin = "SuperAdmin";
+
+    /// <summary>
+    /// The organization admin role can manage users and roles within their own organization.
+    /// </summary>
+    public const string Admin = "Admin";
+
+    /// <summary>
+    /// The default standard user role.
+    /// </summary>
+    public const string User = "User";
+
+    public static bool IsSuperAdminRole(string? roleName) =>
+        string.Equals(roleName, SuperAdmin, StringComparison.OrdinalIgnoreCase);
+
+    public static bool IsAdminRole(string? roleName) =>
+        string.Equals(roleName, Admin, StringComparison.Ordinal)
+        || string.Equals(roleName, "admin", StringComparison.OrdinalIgnoreCase);
+
+    public static bool IsOrganizationAdminOrHigher(string? roleName) =>
+        IsSuperAdminRole(roleName) || IsAdminRole(roleName);
+}
+
+/// <summary>
+/// Centralised helper for resolving the current user's roles from HTTP claims.
+/// </summary>
+public static class RoleChecker
+{
+    public static bool IsSuperAdmin(string? userId, ClaimsPrincipal? user)
+    {
+        if (SuperAdmin.IsSuperAdmin(userId)) return true;
+        if (user?.Identity?.IsAuthenticated != true) return false;
+        return user.Claims.Any(c => c.Type == ClaimTypes.Role && RoleNames.IsSuperAdminRole(c.Value));
+    }
+
+    public static bool IsAdmin(string? userId, ClaimsPrincipal? user)
+    {
+        if (IsSuperAdmin(userId, user)) return true;
+        if (user?.Identity?.IsAuthenticated != true) return false;
+        return user.Claims.Any(c => c.Type == ClaimTypes.Role && RoleNames.IsAdminRole(c.Value));
+    }
+
+    public static bool HasRole(ClaimsPrincipal? user, string roleName)
+    {
+        if (user?.Identity?.IsAuthenticated != true) return false;
+        return user.Claims.Any(c => c.Type == ClaimTypes.Role && string.Equals(c.Value, roleName, StringComparison.OrdinalIgnoreCase));
+    }
+
+    public static string? GetUserId(ClaimsPrincipal? user) =>
+        user?.Claims.FirstOrDefault(c => c.Type == "user_id")?.Value;
+
+    public static string[] GetRoles(ClaimsPrincipal? user) =>
+        user?.Claims.Where(c => c.Type == ClaimTypes.Role).Select(c => c.Value).ToArray() ?? Array.Empty<string>();
 }
 
 public enum AuthorizationDenialReason
@@ -82,15 +164,27 @@ public sealed record AuthorizationDecision(bool Allowed, AuthorizationDenialReas
 public sealed class Role
 {
     private Role() { }
-    public Role(string id, string tenantId, string name)
+    public Role(string id, string tenantId, string name, string? description = null)
     {
         Id = Tenant.Required(id, nameof(id), "Role ID is required.");
         TenantId = Tenant.Required(tenantId, nameof(tenantId), "Tenant ID is required.");
         Name = Tenant.Required(name, nameof(name), "Role name is required.");
+        Description = description;
     }
     public string Id { get; private set; } = null!;
     public string TenantId { get; private set; } = null!;
     public string Name { get; private set; } = null!;
+    public string? Description { get; private set; }
+
+    public void Rename(string name)
+    {
+        Name = Tenant.Required(name, nameof(name), "Role name is required.");
+    }
+
+    public void SetDescription(string? description)
+    {
+        Description = description;
+    }
 }
 
 public sealed class RolePermission
@@ -144,6 +238,7 @@ public interface IAuthorizationRepository
     Task<UserMembership?> GetMembershipForUserAsync(string tenantId, string userId, CancellationToken cancellationToken = default);
     Task<IReadOnlyList<(Role Role, IReadOnlyList<RolePermission> Permissions, MembershipRoleAssignment Assignment)>>
         GetAssignmentsAsync(UserMembership membership, CancellationToken cancellationToken = default);
+    Task<IReadOnlySet<string>> GetUserRolesAsync(string tenantId, string userId, CancellationToken cancellationToken = default);
 }
 
 public sealed class AuthorizationRepository(OrganizationDbContext db) : IAuthorizationRepository
@@ -160,6 +255,27 @@ public sealed class AuthorizationRepository(OrganizationDbContext db) : IAuthori
         var permissions = await db.RolePermissions.AsNoTracking().Where(x => x.TenantId == membership.TenantId && roleIds.Contains(x.RoleId)).ToListAsync(cancellationToken);
         return assignments.Where(x => roles.ContainsKey(x.RoleId)).Select(x => (roles[x.RoleId], (IReadOnlyList<RolePermission>)permissions.Where(p => p.RoleId == x.RoleId).ToList(), x)).ToList();
     }
+
+    public async Task<IReadOnlySet<string>> GetUserRolesAsync(string tenantId, string userId, CancellationToken cancellationToken = default)
+    {
+        var membership = await db.UserMemberships.AsNoTracking()
+            .FirstOrDefaultAsync(m => m.TenantId == tenantId && m.UserId == userId, cancellationToken);
+        if (membership is null) return new HashSet<string>();
+
+        var roleIds = await db.MembershipRoleAssignments.AsNoTracking()
+            .Where(a => a.TenantId == tenantId && a.MembershipId == membership.Id)
+            .Select(a => a.RoleId)
+            .ToArrayAsync(cancellationToken);
+
+        if (roleIds.Length == 0) return new HashSet<string>();
+
+        var roleNames = await db.Roles.AsNoTracking()
+            .Where(r => r.TenantId == tenantId && roleIds.Contains(r.Id))
+            .Select(r => r.Name)
+            .ToArrayAsync(cancellationToken);
+
+        return new HashSet<string>(roleNames, StringComparer.OrdinalIgnoreCase);
+    }
 }
 
 public interface IAuthorizationEvaluator
@@ -172,11 +288,24 @@ public sealed class ScopedAuthorizationEvaluator(IAuthorizationRepository reposi
     public async Task<AuthorizationDecision> AuthorizeAsync(AuthorizationRequest request, CancellationToken cancellationToken = default)
     {
         ArgumentNullException.ThrowIfNull(request);
+        
+        // Super admin bypasses all authorization checks
+        if (SuperAdmin.IsSuperAdmin(request.Context.UserId))
+        {
+            return AuthorizationDecision.Allow();
+        }
+        
         var membership = await repository.GetMembershipForUserAsync(request.Context.TenantId, request.Context.UserId, cancellationToken);
         if (membership is null) return AuthorizationDecision.Deny(AuthorizationDenialReason.MissingMembership);
         if (!membership.IsActive) return AuthorizationDecision.Deny(AuthorizationDenialReason.InactiveMembership);
 
         var assignments = await repository.GetAssignmentsAsync(membership, cancellationToken);
+        
+        // Super admin role has all access and permissions
+        if (assignments.Any(x => RoleNames.IsSuperAdminRole(x.Role.Name)))
+        {
+            return AuthorizationDecision.Allow();
+        }
         var permissionAssignments = assignments.Where(x => x.Permissions.Any(p => p.Permission == request.Permission.ToString())).ToList();
         if (permissionAssignments.Count == 0) return AuthorizationDecision.Deny(AuthorizationDenialReason.MissingPermission);
         var scopedMatches = permissionAssignments.Where(x => ScopeMatches(x.Assignment, request.Scope)).ToList();

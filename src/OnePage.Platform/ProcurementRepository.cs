@@ -6,6 +6,7 @@ public interface IProcurementRepository
 {
     Task<PurchaseOrder> CreateAsync(PurchaseOrder po, CancellationToken cancellationToken = default);
     Task<PurchaseOrder?> GetAsync(string id, CancellationToken cancellationToken = default);
+    Task<IReadOnlyList<PurchaseOrder>> ListAsync(string tenantId, CancellationToken cancellationToken = default);
     Task UpdateAsync(PurchaseOrder po, CancellationToken cancellationToken = default);
 }
 
@@ -20,6 +21,13 @@ public sealed class ProcurementRepository(OrganizationDbContext db) : IProcureme
     }
     public Task<PurchaseOrder?> GetAsync(string id, CancellationToken cancellationToken = default) =>
         _db.PurchaseOrders.AsNoTracking().SingleOrDefaultAsync(x => x.Id == id, cancellationToken);
+
+    public async Task<IReadOnlyList<PurchaseOrder>> ListAsync(string tenantId, CancellationToken cancellationToken = default)
+    {
+        var list = await _db.PurchaseOrders.AsNoTracking().Where(x => x.TenantId == tenantId).ToListAsync(cancellationToken);
+        return list.OrderByDescending(x => x.CreatedAt).ToList();
+    }
+
     public async Task UpdateAsync(PurchaseOrder po, CancellationToken cancellationToken = default)
     {
         _db.PurchaseOrders.Update(po);

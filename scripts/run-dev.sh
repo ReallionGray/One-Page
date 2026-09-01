@@ -8,7 +8,7 @@ ROOT_DIR=$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)
 cd "$ROOT_DIR"
 
 API_URL=http://localhost:5001
-UI_URL=http://localhost:5002
+UI_URL=http://localhost:5000
 
 mkdir -p ./logs
 
@@ -39,7 +39,7 @@ UI_PID=$!
 # wait for UI port
 echo -n "Waiting for UI to listen on $UI_URL"
 for i in {1..60}; do
-  if lsof -iTCP -sTCP:LISTEN -P -n | grep -q ':5002'; then
+  if lsof -iTCP -sTCP:LISTEN -P -n | grep -q ':5000'; then
     echo " -> up"
     break
   fi
@@ -47,7 +47,7 @@ for i in {1..60}; do
   sleep 0.5
 done
 
-if ! lsof -iTCP -sTCP:LISTEN -P -n | grep -q ':5002'; then
+if ! lsof -iTCP -sTCP:LISTEN -P -n | grep -q ':5000'; then
   echo "UI failed to start; see ./logs/ui.log"
   echo "API logs: ./logs/api.log"
   exit 1
