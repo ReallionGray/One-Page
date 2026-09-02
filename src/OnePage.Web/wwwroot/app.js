@@ -276,6 +276,7 @@ const ALL_METRIC_SPECS = [
   { key: 'inventoryItemCount', label: 'Inventory Items', icon: 'boxes', module: 'inventory', endpoint: '/inventory/items' },
   { key: 'totalInventoryQuantity', label: 'Total Stock', icon: 'archive', module: 'inventory', endpoint: '/inventory/items' },
   { key: 'totalPurchaseOrders', label: 'Purchase Orders', icon: 'file-text', module: 'purchaseOrders', endpoint: '/procurement/purchase-orders' },
+  { key: 'totalPayroll', label: 'Payroll (Paid)', icon: 'wallet2', module: 'payroll', endpoint: '/payroll/records', money: true },
   { key: 'totalJournalEntries', label: 'Journal Entries', icon: 'journal', module: 'finance', endpoint: '/finance/journal-entries' }
 ];
 
@@ -369,7 +370,7 @@ function ModuleChart({ items, field, label }) {
     ctx.chartInstance = new Chart(ctx, {
       type: 'bar',
       data: { labels, datasets: [{ label: label || 'Count', data: dataValues, backgroundColor: 'rgba(110, 231, 183, .35)', borderColor: '#6ee7b7', borderWidth: 1 }] },
-      options: { plugins: { legend: { display: false } }, responsive: true, maintainHeight: false, scales: { y: { ticks: { color: '#94a3b8' }, grid: { color: 'rgba(255,255,255,.06)' } }, x: { ticks: { color: '#94a3b8' }, grid: { display: false } } } }
+      options: { plugins: { legend: { display: false } }, responsive: true, maintainAspectRatio: false, scales: { y: { ticks: { color: '#94a3b8' }, grid: { color: 'rgba(255,255,255,.06)' } }, x: { ticks: { color: '#94a3b8' }, grid: { display: false } } } }
     });
     return () => { if (ctx.chartInstance) ctx.chartInstance.destroy(); ctx.chartInstance = null; };
   }, [items, field, label]);
@@ -480,14 +481,39 @@ function AssetForm({ onCreated }) {
       e('div', { className: 'col-12 col-sm-4 field d-flex align-items-end' }, e('button', { type: 'submit', className: 'btn btn-accent w-100', disabled: submitting }, submitting ? e('span', { className: 'spinner-border spinner-border-sm' }) : 'Create Asset'))));
 }
 
+function pad2(n) { return String(n).padStart(2, '0'); }
+
+function DigitalClock() {
+  const [now, setNow] = React.useState(() => new Date());
+  React.useEffect(() => {
+    const id = setInterval(() => setNow(new Date()), 1000);
+    return () => clearInterval(id);
+  }, []);
+  const hours = pad2(now.getHours());
+  const minutes = pad2(now.getMinutes());
+  const seconds = pad2(now.getSeconds());
+  const dateLabel = now.toLocaleDateString(undefined, { weekday: 'short', day: 'numeric', month: 'short', year: 'numeric' });
+  return e('div', { className: 'digital-clock', role: 'timer', 'aria-label': 'Current time ' + hours + ':' + minutes + ':' + seconds + ', ' + dateLabel },
+    e('div', { className: 'digital-clock-time', 'aria-hidden': 'true' },
+      e('span', null, hours),
+      e('span', { className: 'digital-clock-colon' }, ':'),
+      e('span', null, minutes),
+      e('span', { className: 'digital-clock-colon' }, ':'),
+      e('span', null, seconds)),
+    e('div', { className: 'digital-clock-date' }, dateLabel));
+}
+
 function DashboardHeader({ loading, onRefresh }) {
   return e('div', { className: 'hero-banner' },
-    e('div', { className: 'd-flex align-items-center gap-2' },
-      e('span', { className: 'live-dot' }),
-      e('span', null, 'Live')),
-    e('p', null, 'OnePage operations dashboard. All modules are tenant-scoped.'),
-    e('div', { className: 'mt-2 d-flex gap-2' },
-      e('button', { className: 'btn btn-sm btn-light', onClick: onRefresh, disabled: loading }, loading ? e('span', { className: 'spinner-border spinner-border-sm' }) : e('i', { className: 'bi bi-arrow-clockwise' }), ' Refresh')));
+    e('div', { className: 'brand' },
+      e('div', { className: 'logo', 'aria-hidden': 'true' }),
+      e('div', null,
+        e('h1', { className: 'hero-title' }, 'One Page'),
+        e('p', { className: 'hero-tagline' }, 'Operations dashboard'))),
+    e('div', { className: 'hero-banner-right' },
+      e(DigitalClock),
+      e('button', { className: 'btn btn-sm btn-light', onClick: onRefresh, disabled: loading, title: 'Refresh dashboard', 'aria-label': 'Refresh dashboard' },
+        loading ? e('span', { className: 'spinner-border spinner-border-sm' }) : e('i', { className: 'bi bi-arrow-clockwise' }))));
 }
 
 const MONTH_NAMES = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
@@ -531,7 +557,7 @@ function SegmentedChart({ segments, money }) {
             labelValue: (ctx) => money ? formatMoney(ctx.dataset.data[ctx.dataIndex]) : ctx.dataset.data[ctx.dataIndex]
           }
         }},
-        responsive: true, maintainHeight: false,
+        responsive: true, maintainAspectRatio: false,
         animation: { duration: 700, easing: 'easeOutQuart' },
         scales: {
           y: { beginAtZero: true, ticks: { color: '#94a3b8', precision: 0 }, grid: { color: 'rgba(255,255,255,.06)' } },
@@ -591,16 +617,80 @@ function CalendarGrid({ month, year, events }) {
   );
 }
 
-function EventBadge({ event }) {
+function EventBadge({ event, className }) {
   var h = humanizeAuditEvent(event);
-  return e('div', { className: 'event-badge' },
+  var badgeClass = 'event-badge' + (className ? ' ' + className : '');
+  return e('div', { className: badgeClass },
     e('span', { className: 'event-dot', style: { color: h.color } }, '●'),
     e('div', { className: 'event-badge-body' },
       e('div', { className: 'event-title' }, h.title),
       e('div', { className: 'event-desc' }, h.desc || ' '),
       e('div', { className: 'event-meta' },
-        e('span', { className: 'event-type' }, h.user !== 'System' ? 'User: ' + h.user : 'System'),
-        e('span', { className: 'event-status' }, h.createdAt ? new Date(h.createdAt).toLocaleTimeString() : ''))));
+        e('span', { className: 'event-type' }, h.user !== 'System' ? 'By ' + h.user : 'System'),
+        e('span', { className: 'event-time' }, h.createdAt ? new Date(h.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : ''))));
+}
+
+// ===== Activity News Carousel (top-of-dashboard, horizontal scroll feed) =====
+function ActivityCarousel({ events }) {
+  const sorted = events.length > 0
+    ? events.slice().sort((a, b) => new Date(b.createdAt || '') - new Date(a.createdAt || '')).slice(0, 12)
+    : [];
+  const trackRef = React.useRef(null);
+  const [hasOverflow, setHasOverflow] = React.useState(false);
+  const [showPrev, setShowPrev] = React.useState(false);
+  const [showNext, setShowNext] = React.useState(false);
+  const [paused, setPaused] = React.useState(false);
+  const STEP = 280; // px to slide per tick (~one 280px item + gap)
+
+  const updateNav = React.useCallback(() => {
+    const t = trackRef.current;
+    if (!t) { setHasOverflow(false); setShowPrev(false); setShowNext(false); return; }
+    const overflow = t.scrollWidth > t.clientWidth + 1;
+    setHasOverflow(overflow);
+    setShowPrev(overflow && t.scrollLeft > 8);
+    setShowNext(overflow && t.scrollLeft + t.clientWidth < t.scrollWidth - 8);
+  }, []);
+
+  React.useEffect(() => {
+    if (!sorted.length) return;
+    const t = trackRef.current;
+    if (!t) return;
+    updateNav();
+    t.addEventListener('scroll', updateNav);
+    return () => t.removeEventListener('scroll', updateNav);
+  }, [sorted, updateNav]);
+
+  // Auto-slide (one item every 4s) when there is overflow and the user isn't hovering
+  React.useEffect(() => {
+    if (!hasOverflow || paused) return;
+    const tick = () => {
+      const t = trackRef.current;
+      if (!t || paused) return;
+      if (t.scrollWidth <= t.clientWidth + 1) return; // overflow vanished (e.g. resize)
+      if (t.scrollLeft + t.clientWidth >= t.scrollWidth - 24) {
+        t.scrollTo({ left: 0, behavior: 'smooth' }); // loop back to start
+      } else {
+        t.scrollBy({ left: STEP, behavior: 'smooth' });
+      }
+    };
+    const id = setInterval(tick, 4000);
+    return () => clearInterval(id);
+  }, [hasOverflow, paused]);
+
+  const scrollPrev = () => { const t = trackRef.current; if (t) t.scrollBy({ left: -STEP, behavior: 'smooth' }); };
+  const scrollNext = () => { const t = trackRef.current; if (t) t.scrollBy({ left: STEP, behavior: 'smooth' }); };
+
+  const navButtons = e('div', { className: 'carousel-nav' },
+    e('button', { className: 'carousel-nav-btn', onClick: scrollPrev, disabled: !showPrev, title: 'Previous', 'aria-label': 'Previous activity' }, e('i', { className: 'bi bi-chevron-left' })),
+    e('button', { className: 'carousel-nav-btn', onClick: scrollNext, disabled: !showNext, title: 'Next', 'aria-label': 'Next activity' }, e('i', { className: 'bi-chevron-right' })));
+
+  return e('div', { className: 'activity-carousel chart-card card-ghost mb-3' },
+    e('div', { className: 'activity-carousel-head' },
+      e('span', { className: 'chart-card-title' }, 'Recent Activity'),
+      navButtons),
+    sorted.length > 0
+      ? e('div', { className: 'activity-carousel-track', ref: trackRef, onMouseEnter: () => setPaused(true), onMouseLeave: () => setPaused(false) }, sorted.map(ev => e(EventBadge, { key: ev.id || ev.createdAt, event: ev, className: 'carousel-item' })))
+      : e('div', { className: 'chart-placeholder' }, 'No recent activity'));
 }
 
 function DashboardPage() {
@@ -610,6 +700,20 @@ function DashboardPage() {
   const [schedule, setSchedule] = React.useState([]);
   const [loading, setLoading] = React.useState(false);
   const [events, setEvents] = React.useState([]);
+
+  // Calendar month navigation state — starts at the current month
+  const now = new Date();
+  const [calendarMonth, setCalendarMonth] = React.useState(now.getMonth());
+  const [calendarYear, setCalendarYear] = React.useState(now.getFullYear());
+
+  const prevMonth = () => {
+    if (calendarMonth === 0) { setCalendarMonth(11); setCalendarYear(y => y - 1); }
+    else { setCalendarMonth(m => m - 1); }
+  };
+  const nextMonth = () => {
+    if (calendarMonth === 11) { setCalendarMonth(0); setCalendarYear(y => y + 1); }
+    else { setCalendarMonth(m => m + 1); }
+  };
 
   const fetchDashboard = React.useCallback(async () => {
     setLoading(true);
@@ -643,6 +747,7 @@ function DashboardPage() {
 
   return e('div', { className: 'module-page' },
     e(DashboardHeader, { loading, onRefresh: fetchDashboard }),
+    e(ActivityCarousel, { events }),
     e('div', { className: 'metrics-grid' }, ALL_METRIC_SPECS.filter(spec => canViewModule(user, spec.module)).map(spec => e(MetricCard, { key: spec.key, spec }))),
     e('div', { className: 'charts-grid' },
       e('div', { className: 'chart-card card-ghost h-100' },
@@ -652,20 +757,14 @@ function DashboardPage() {
       ANALYTICS_CHART_SPECS.map(c => canViewModule(user, c.module)
         ? e(AnalyticsChartCard, { key: c.key, spec: c, segments: analytics[c.key] || [] })
         : null),
-    e('div', { className: 'chart-card card-ghost' },
-      e('div', { className: 'chart-card-head' }, e('h6', { className: 'chart-card-title' }, 'Recent Activity')),
-      e('div', { className: 'event-list' },
-        events.length === 0
-          ? e('div', { className: 'chart-placeholder' }, 'No recent activity' )
-          : events.slice().sort((a, b) => new Date(b.createdAt || '') - new Date(a.createdAt || '')).slice(0, 8).map(ev => e(EventBadge, { key: ev.id || ev.createdAt, event: ev })))),
     schedule.length > 0 && e('div', { className: 'chart-card chart-card-full card-ghost mb-3' },
       e('div', { className: 'chart-card-head' }, e('h6', { className: 'chart-card-title' }, 'Schedule')),
       e('div', { className: 'calendar-section' },
         e('div', { className: 'calendar-header' },
-          e('button', { className: 'btn btn-sm btn-outline-light', onClick: () => {} }, '‹'), // prev month simplified
-          e('div', { className: 'calendar-title' }, MONTH_NAMES[new Date().getMonth()] + ' ' + new Date().getFullYear()),
-          e('button', { className: 'btn btn-sm btn-outline-light', onClick: () => {} }, '›')),
-        e(CalendarGrid, { month: new Date().getMonth(), year: new Date().getFullYear(), events: schedule })))),
+          e('button', { className: 'btn btn-sm btn-outline-light', onClick: prevMonth, title: 'Previous month' }, '‹'),
+          e('div', { className: 'calendar-title' }, MONTH_NAMES[calendarMonth] + ' ' + calendarYear),
+          e('button', { className: 'btn btn-sm btn-outline-light', onClick: nextMonth, title: 'Next month' }, '›')),
+        e(CalendarGrid, { month: calendarMonth, year: calendarYear, events: schedule })))),
 
     e(ToastHost)
   );
